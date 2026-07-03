@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIS Tracker – Brésil</title>
+
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.css" />
+<link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div id="map"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <h1>AIS Tracker <small>— Brésil</small></h1>
+  </div>
+
+  <div id="status" class="status status-disconnected">
+    <span class="status-led"></span>
+    <span id="status-text">Déconnecté</span>
+  </div>
+
+  <div id="conn-controls">
+    <button id="btn-connect">Se connecter</button>
+    <button id="btn-disconnect" class="hidden">Se déconnecter</button>
+    <button id="btn-recenter" title="Recentrer sur la zone">🔍 Zone</button>
+    <button id="btn-zone-toggle" title="Modifier la zone">⚙︎ Zone</button>
+  </div>
+</header>
+
+<div id="login-modal" class="modal-overlay">
+  <div class="modal">
+    <h2>Connexion à AISStream.io</h2>
+    <p>Entrez votre clé API AISStream pour recevoir les positions AIS en direct au large du Brésil.</p>
+    <label for="api-key-input">Clé API</label>
+    <input type="password" id="api-key-input" placeholder="Votre clé API AISStream.io" autocomplete="off" />
+    <label class="checkbox-row">
+      <input type="checkbox" id="remember-key" checked />
+      Mémoriser la clé sur cet appareil
+    </label>
+    <div class="modal-actions">
+      <button id="btn-modal-connect">Se connecter</button>
+    </div>
+    <p class="hint">
+      Pas de clé ? Créez un compte gratuit sur
+      <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>.
+    </p>
+    <p id="login-error" class="login-error hidden"></p>
+  </div>
+</div>
+
+<div id="zone-panel" class="panel hidden">
+  <h3>Zone surveillée</h3>
+  <div class="zone-grid">
+    <label>Nord <input type="number" id="zone-north" step="0.1"></label>
+    <label>Sud <input type="number" id="zone-south" step="0.1"></label>
+    <label>Ouest <input type="number" id="zone-west" step="0.1"></label>
+    <label>Est <input type="number" id="zone-east" step="0.1"></label>
+  </div>
+  <button id="btn-zone-apply">Appliquer et reconnecter</button>
+</div>
+
+<div id="legend" class="panel">
+  <h3>Flotte visible</h3>
+  <div class="legend-total">
+    <span id="legend-total-count">0</span> navire(s) dans la vue
+  </div>
+  <ul id="legend-list"></ul>
+  <div class="legend-footnote">
+    Zoom ≥ <span id="legend-zoom-threshold"></span> : navires individuels · en-deçà : agrégats
+  </div>
+  <div class="legend-updated">Mis à jour : <span id="legend-updated-at">—</span></div>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/leaflet.markercluster/leaflet.markercluster.js"></script>
+<script src="js/config.js"></script>
+<script src="js/shipTypes.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1c2733;
+}
+
+#map {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* --- Topbar --- */
+
+#topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  background: rgba(15, 26, 41, 0.92);
+  color: #f2f6fa;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2ecc71;
+  box-shadow: 0 0 6px #2ecc71;
+}
+
+.brand h1 {
+  font-size: 16px;
+  margin: 0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.brand h1 small {
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.status-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #888;
+}
+
+.status-connected .status-led { background: #2ecc71; box-shadow: 0 0 6px #2ecc71; }
+.status-connecting .status-led { background: #f1c40f; animation: pulse 1s infinite; }
+.status-error .status-led { background: #e74c3c; }
+.status-disconnected .status-led { background: #888; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+#conn-controls {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #2E86DE;
+  color: white;
+  transition: background 0.15s ease;
+}
+
+button:hover {
+  background: #2872b8;
+}
+
+#btn-disconnect {
+  background: #e74c3c;
+}
+#btn-disconnect:hover {
+  background: #c0392b;
+}
+
+#btn-recenter, #btn-zone-toggle {
+  background: rgba(255, 255, 255, 0.12);
+}
+#btn-recenter:hover, #btn-zone-toggle:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* --- Panels (legend, zone) --- */
+
+.panel {
+  position: absolute;
+  z-index: 900;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  padding: 14px 16px;
+  font-size: 13px;
+}
+
+.panel h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+#legend {
+  bottom: 20px;
+  left: 16px;
+  min-width: 220px;
+  max-width: 260px;
+}
+
+.legend-total {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+#legend-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+#legend-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.legend-swatch {
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0,0,0,0.25);
+}
+
+.legend-label {
+  flex: 1;
+}
+
+.legend-count {
+  font-weight: 600;
+}
+
+.legend-footnote {
+  font-size: 11px;
+  color: #667;
+  border-top: 1px solid #e2e6ea;
+  padding-top: 6px;
+  margin-top: 4px;
+}
+
+.legend-updated {
+  font-size: 11px;
+  color: #889;
+  margin-top: 4px;
+}
+
+#zone-panel {
+  top: 66px;
+  right: 16px;
+  width: 220px;
+}
+
+.zone-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.zone-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  color: #445;
+  gap: 3px;
+}
+
+.zone-grid input {
+  width: 100%;
+  min-width: 0;
+  padding: 5px 6px;
+  border: 1px solid #ccd3da;
+  border-radius: 5px;
+  font-size: 13px;
+}
+
+#btn-zone-apply {
+  width: 100%;
+}
+
+/* --- Login modal --- */
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(10, 16, 26, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  padding: 28px 30px;
+  width: 360px;
+  max-width: 90vw;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.modal h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.modal p {
+  font-size: 13px;
+  color: #445;
+  line-height: 1.4;
+}
+
+.modal label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+.modal input[type="password"] {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid #ccd3da;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400 !important;
+  font-size: 12px !important;
+}
+
+.checkbox-row input {
+  width: auto;
+}
+
+.modal-actions {
+  margin-top: 16px;
+}
+
+.modal-actions button {
+  width: 100%;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.modal .hint {
+  font-size: 11px;
+  color: #778;
+  margin-top: 14px;
+}
+
+.login-error {
+  margin-top: 10px;
+  color: #c0392b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* --- Ship markers --- */
+
+.vessel-icon-wrapper {
+  background: transparent;
+  border: none;
+}
+
+.vessel-marker {
+  width: 14px;
+  height: 14px;
+  background: var(--vcolor, #888);
+  clip-path: polygon(50% 0%, 100% 100%, 50% 78%, 0% 100%);
+  border: 1px solid rgba(0, 0, 0, 0.45);
+}
+
+.vessel-marker.no-heading {
+  clip-path: circle(45% at 50% 50%);
+}
+
+.vessel-popup {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+/* Marker cluster styling tweaks to match theme */
+.marker-cluster div {
+  font-weight: 700;
+}
