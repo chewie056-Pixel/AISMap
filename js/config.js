@@ -2,14 +2,6 @@
 
 const AIS_STREAM_URL = "wss://stream.aisstream.io/v0/stream";
 
-// Zone par défaut : au large du Brésil (façade atlantique)
-const DEFAULT_ZONE = {
-  north: 6,
-  south: -35,
-  west: -54,
-  east: -28,
-};
-
 // Zoom à partir duquel les navires sont affichés individuellement.
 // En-dessous de ce niveau, les navires sont agrégés (cluster + compteur).
 const CLUSTER_DISABLE_ZOOM = 8;

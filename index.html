@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>AIS Tracker – Brésil</title>
+<title>AIS Tracker</title>
 
 <link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
 <link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.css" />
@@ -17,7 +17,7 @@
 <header id="topbar">
   <div class="brand">
     <span class="brand-dot"></span>
-    <h1>AIS Tracker <small>— Brésil</small></h1>
+    <h1>AIS Tracker <small>— suivi maritime en direct</small></h1>
   </div>
 
   <div id="status" class="status status-disconnected">
@@ -35,14 +35,23 @@
 
 <div id="login-modal" class="modal-overlay">
   <div class="modal">
-    <h2>Connexion à AISStream.io</h2>
-    <p>Entrez votre clé API AISStream pour recevoir les positions AIS en direct au large du Brésil.</p>
+    <h2>Configuration du suivi AIS</h2>
+    <p>Entrez votre clé API AISStream.io et la zone géographique (boîte englobante) à surveiller.</p>
     <label for="api-key-input">Clé API</label>
     <input type="password" id="api-key-input" placeholder="Votre clé API AISStream.io" autocomplete="off" />
     <label class="checkbox-row">
       <input type="checkbox" id="remember-key" checked />
       Mémoriser la clé sur cet appareil
     </label>
+
+    <h3 class="modal-subheading">Zone géographique à surveiller</h3>
+    <div class="zone-grid">
+      <label>Nord <input type="number" id="setup-zone-north" step="0.1" placeholder="ex. 10"></label>
+      <label>Sud <input type="number" id="setup-zone-south" step="0.1" placeholder="ex. -10"></label>
+      <label>Ouest <input type="number" id="setup-zone-west" step="0.1" placeholder="ex. -20"></label>
+      <label>Est <input type="number" id="setup-zone-east" step="0.1" placeholder="ex. 20"></label>
+    </div>
+
     <div class="modal-actions">
       <button id="btn-modal-connect">Se connecter</button>
     </div>

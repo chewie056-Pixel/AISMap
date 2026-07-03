@@ -1,4 +1,4 @@
-// AIS Tracker — Brésil
+// AIS Tracker
 // Connexion directe (WebSocket navigateur) à AISStream.io, affichage Leaflet.
 
 let map, markerClusterGroup, zoneRectangle;
@@ -7,7 +7,7 @@ let manualDisconnect = false;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
 let currentApiKey = null;
-let currentZone = { ...DEFAULT_ZONE };
+let currentZone = null; // défini par l'utilisateur avant toute connexion
 let legendDirty = true;
 
 const vessels = new Map(); // mmsi -> vessel state
@@ -34,7 +34,7 @@ function init() {
   setInterval(removeStaleVessels, STALE_CHECK_INTERVAL_MS);
 
   const storedKey = localStorage.getItem(STORAGE_KEY_API);
-  if (storedKey) {
+  if (storedKey && currentZone) {
     connect(storedKey);
   } else {
     showLoginModal();
@@ -54,6 +54,10 @@ function cacheDomRefs() {
   els.rememberKey = document.getElementById("remember-key");
   els.btnModalConnect = document.getElementById("btn-modal-connect");
   els.loginError = document.getElementById("login-error");
+  els.setupZoneNorth = document.getElementById("setup-zone-north");
+  els.setupZoneSouth = document.getElementById("setup-zone-south");
+  els.setupZoneWest = document.getElementById("setup-zone-west");
+  els.setupZoneEast = document.getElementById("setup-zone-east");
 
   els.zonePanel = document.getElementById("zone-panel");
   els.zoneNorth = document.getElementById("zone-north");
@@ -75,19 +79,16 @@ function updateZoomThresholdLabel() {
 // --- Carte ---
 
 function initMap() {
-  map = L.map("map", { worldCopyJump: true, minZoom: 2 }).setView([10, -30], 2);
+  map = L.map("map", { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
 
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "&copy; OpenStreetMap contributors",
     maxZoom: 18,
   }).addTo(map);
 
-  zoneRectangle = L.rectangle(zoneBounds(currentZone), {
-    color: "#ffcc00",
-    weight: 2,
-    fill: false,
-    dashArray: "6,4",
-  }).addTo(map);
+  if (currentZone) {
+    drawZoneRectangle(currentZone);
+  }
 
   markerClusterGroup = L.markerClusterGroup({
     disableClusteringAtZoom: CLUSTER_DISABLE_ZOOM,
@@ -107,12 +108,38 @@ function zoneBounds(zone) {
   ];
 }
 
+function drawZoneRectangle(zone) {
+  const bounds = zoneBounds(zone);
+  if (!zoneRectangle) {
+    zoneRectangle = L.rectangle(bounds, {
+      color: "#ffcc00",
+      weight: 2,
+      fill: false,
+      dashArray: "6,4",
+    }).addTo(map);
+  } else {
+    zoneRectangle.setBounds(bounds);
+  }
+}
+
+function parseZoneInputs(elNorth, elSouth, elWest, elEast) {
+  const north = parseFloat(elNorth.value);
+  const south = parseFloat(elSouth.value);
+  const west = parseFloat(elWest.value);
+  const east = parseFloat(elEast.value);
+  if ([north, south, west, east].some(Number.isNaN) || north <= south || east <= west) {
+    return null;
+  }
+  return { north, south, west, east };
+}
+
 // --- UI wiring ---
 
 function wireUi() {
   els.btnConnect.addEventListener("click", showLoginModal);
   els.btnDisconnect.addEventListener("click", disconnect);
   els.btnRecenter.addEventListener("click", () => {
+    if (!zoneRectangle) return;
     map.fitBounds(zoneRectangle.getBounds(), { padding: [40, 40] });
   });
   els.btnZoneToggle.addEventListener("click", () => {
@@ -128,6 +155,12 @@ function wireUi() {
 
 function showLoginModal() {
   els.loginError.classList.add("hidden");
+  if (currentZone) {
+    els.setupZoneNorth.value = currentZone.north;
+    els.setupZoneSouth.value = currentZone.south;
+    els.setupZoneWest.value = currentZone.west;
+    els.setupZoneEast.value = currentZone.east;
+  }
   els.loginModal.classList.remove("hidden");
 }
 
@@ -141,6 +174,23 @@ function handleModalConnect() {
     showLoginError("Veuillez entrer une clé API AISStream.io.");
     return;
   }
+
+  const zone = parseZoneInputs(
+    els.setupZoneNorth,
+    els.setupZoneSouth,
+    els.setupZoneWest,
+    els.setupZoneEast
+  );
+  if (!zone) {
+    showLoginError("Veuillez définir une zone géographique valide (Nord > Sud, Est > Ouest).");
+    return;
+  }
+
+  currentZone = zone;
+  localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
+  drawZoneRectangle(currentZone);
+  map.fitBounds(zoneRectangle.getBounds(), { padding: [40, 40] });
+
   if (els.rememberKey.checked) {
     localStorage.setItem(STORAGE_KEY_API, key);
   } else {
@@ -157,6 +207,7 @@ function showLoginError(message) {
 }
 
 function populateZoneInputs() {
+  if (!currentZone) return;
   els.zoneNorth.value = currentZone.north;
   els.zoneSouth.value = currentZone.south;
   els.zoneWest.value = currentZone.west;
@@ -164,19 +215,15 @@ function populateZoneInputs() {
 }
 
 function applyZoneFromInputs() {
-  const north = parseFloat(els.zoneNorth.value);
-  const south = parseFloat(els.zoneSouth.value);
-  const west = parseFloat(els.zoneWest.value);
-  const east = parseFloat(els.zoneEast.value);
-
-  if ([north, south, west, east].some(Number.isNaN) || north <= south || east <= west) {
+  const zone = parseZoneInputs(els.zoneNorth, els.zoneSouth, els.zoneWest, els.zoneEast);
+  if (!zone) {
     alert("Coordonnées invalides : vérifiez que Nord > Sud et Est > Ouest.");
     return;
   }
 
-  currentZone = { north, south, west, east };
+  currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
-  zoneRectangle.setBounds(zoneBounds(currentZone));
+  drawZoneRectangle(currentZone);
   els.zonePanel.classList.add("hidden");
 
   if (currentApiKey) {
