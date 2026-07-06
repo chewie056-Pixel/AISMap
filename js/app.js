@@ -9,6 +9,7 @@ let reconnectTimer = null;
 let currentApiKey = null;
 let currentZone = { ...DEFAULT_ZONE }; // modifiable par l'utilisateur avant connexion
 let legendDirty = true;
+let messageCount = 0;
 
 const vessels = new Map(); // mmsi -> vessel state
 
@@ -260,11 +261,12 @@ function connect(apiKey) {
 
   ws.onopen = () => {
     reconnectAttempts = 0;
+    messageCount = 0;
     ws.send(
       JSON.stringify({
         APIKey: apiKey,
         BoundingBoxes: [zoneBounds(currentZone)],
-        FilterMessageTypes: ["PositionReport", "ShipStaticData"],
+        FilterMessageTypes: ["PositionReport", "StandardClassBPositionReport", "ShipStaticData"],
       })
     );
     setStatus("connected", "Connecté — en attente de données…");
@@ -274,9 +276,16 @@ function connect(apiKey) {
     let data;
     try {
       data = JSON.parse(evt.data);
-    } catch {
+    } catch (e) {
+      console.warn("AIS: message non-JSON ignoré", evt.data, e);
       return;
     }
+    messageCount++;
+    if (messageCount <= 3) {
+      // Aide au diagnostic : affiche la forme brute des premiers messages reçus.
+      console.debug("AIS: message reçu", data);
+    }
+    setStatus("connected", `Connecté — ${messageCount} message(s) reçu(s), ${vessels.size} navire(s) suivi(s)`);
     handleMessage(data);
   };
 
@@ -337,6 +346,7 @@ function setStatus(state, text) {
 
 function handleMessage(data) {
   if (data.error) {
+    console.error("AIS: erreur reçue du serveur", data.error);
     showLoginError(data.error);
     setStatus("error", data.error);
     disconnect();
@@ -345,13 +355,22 @@ function handleMessage(data) {
 
   const type = data.MessageType;
   const meta = data.MetaData || {};
-  const mmsi = meta.MMSI;
-  if (!mmsi) return;
+  const posReport =
+    data.Message?.PositionReport || data.Message?.StandardClassBPositionReport;
+  const mmsi =
+    meta.MMSI ?? meta.Mmsi ?? posReport?.UserID ?? data.Message?.ShipStaticData?.UserID;
 
-  if (type === "PositionReport" && data.Message?.PositionReport) {
-    upsertPosition(mmsi, meta, data.Message.PositionReport);
+  if (!mmsi) {
+    console.warn("AIS: MMSI introuvable dans le message, ignoré", data);
+    return;
+  }
+
+  if (posReport) {
+    upsertPosition(mmsi, meta, posReport);
   } else if (type === "ShipStaticData" && data.Message?.ShipStaticData) {
     upsertStatic(mmsi, meta, data.Message.ShipStaticData);
+  } else {
+    console.debug("AIS: type de message non traité", type);
   }
 }
 
@@ -366,14 +385,18 @@ function getOrCreateVessel(mmsi) {
 
 function upsertPosition(mmsi, meta, pr) {
   const v = getOrCreateVessel(mmsi);
-  v.lat = meta.latitude ?? pr.Latitude;
-  v.lon = meta.longitude ?? pr.Longitude;
+  v.lat = meta.latitude ?? meta.Latitude ?? pr.Latitude ?? pr.latitude;
+  v.lon = meta.longitude ?? meta.Longitude ?? pr.Longitude ?? pr.longitude;
   v.cog = pr.Cog;
   v.sog = pr.Sog;
   v.heading = pr.TrueHeading;
   v.navStatus = pr.NavigationalStatus;
   if (!v.name && meta.ShipName) v.name = meta.ShipName.trim();
   v.lastUpdate = Date.now();
+  if (v.lat === undefined || v.lon === undefined) {
+    console.warn("AIS: position sans latitude/longitude exploitable, ignorée", { mmsi, meta, pr });
+    return;
+  }
   placeVesselMarker(v);
   legendDirty = true;
 }
