@@ -1,0 +1,13 @@
+{
+  "name": "ais-tracker-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serveur local AIS Tracker : relais AISStream unique, enregistrement CSV/JSON, rejeu à vitesse variable.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

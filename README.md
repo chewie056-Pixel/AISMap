@@ -1,111 +1,132 @@
 # AIS Tracker
 
-Application web (front-end pur, sans backend) qui se connecte en direct au
-flux AIS de [AISStream.io](https://aisstream.io) via WebSocket et affiche les
-positions des navires sur une carte mondiale, dans une zone géographique
-définie par l'utilisateur.
+Application de suivi maritime en direct à partir du flux AIS de
+[AISStream.io](https://aisstream.io). Un petit serveur local Node.js détient
+l'unique connexion AISStream (persistante, indépendante des onglets ouverts),
+peut l'enregistrer sur disque (CSV ou JSON) et la rejouer à vitesse variable ;
+le navigateur affiche tout ça sur une carte Leaflet.
 
 ## Fonctionnalités
 
-- **Connexion AISStream.io** : entrez votre clé API personnelle (créée
-  gratuitement sur aisstream.io) directement dans l'application. La
-  connexion WebSocket se fait depuis le navigateur, la clé peut être
-  mémorisée localement (localStorage).
-- **Zone géographique définie par l'utilisateur** : au premier lancement,
-  l'application demande une zone (boîte englobante Nord/Sud/Ouest/Est) en
-  plus de la clé API. Aucune zone n'est présélectionnée : c'est cette zone
-  qui détermine la souscription AISStream et les navires affichés. Elle est
-  modifiable à tout moment depuis le menu **🗺️ Carte** du bandeau, soit par
-  valeurs numériques, soit en la **dessinant directement sur la carte**
-  (cliquez-glissez pour tracer le nouveau rectangle, Échap pour annuler). Si
-  une connexion est active, elle est automatiquement relancée avec la
-  nouvelle zone.
-- **Carte mondiale** avec la zone surveillée encadrée par un rectangle.
-- **Menu 🗺️ Carte** (bandeau) : regroupe toutes les options d'affichage —
-  agrégation des navires, affichage des stations de base et des aides à la
-  navigation sur la carte, recentrage sur la zone, dessin d'une nouvelle
-  zone, et édition numérique de la zone.
-- **Affichage adaptatif selon le zoom** :
-  - zoom ≥ 8 : chaque navire est affiché individuellement (triangle orienté
-    selon son cap/heading, coloré selon son type).
-  - zoom < 8 : les navires sont agrégés en clusters affichant uniquement le
-    nombre de navires regroupés. Activable/désactivable depuis le menu Carte.
-- **Légende dynamique** (bas gauche) : répartition de la flotte visible par
-  catégorie (Cargo, Pétrolier, Passagers, Pêche, Plaisance, etc.), nombre
-  total de navires actuellement dans la vue, ainsi que le nombre de stations
-  de base et d'aides à la navigation visibles (si affichées sur la carte).
-- Reconnexion automatique avec backoff exponentiel en cas de coupure, et
-  purge des navires n'ayant pas émis depuis 15 minutes.
-- **Page « Stations »** (`stations.html`, lien 📡 dans le bandeau) : liste les
-  stations AIS de base (balises côtières/terrestres, messages *Base Station
-  Report*) qui émettent dans la zone configurée sur la page principale, avec
-  leurs caractéristiques (type de positionnement EPFD, RAIM, heure UTC de la
-  station, nom si AISStream l'associe au MMSI) et une estimation du nombre de
-  navires suivis à proximité (rayon configurable, `STATION_PROXIMITY_RADIUS_KM`
-  dans `js/config.js`).
-  ⚠️ L'AIS ne relie pas un message navire à la station qui l'a reçu : ce
-  nombre est une estimation géographique, pas un décompte réel de réception.
-  Cette page n'ouvre **pas** sa propre connexion : elle affiche les données
-  reçues par la page principale (ouverte et connectée dans un autre onglet),
-  relayées via `BroadcastChannel` — voir la note ci-dessous sur les
-  connexions multiples.
-- **Aides à la navigation (AtoN)** : bouées, phares et balises AIS (message
-  type 21) affichables sur la carte depuis le menu Carte (icône ⚓), avec nom,
-  type et statut « hors position » au clic.
-- **Messages de sécurité** (message type 14, *Safety Broadcast*) : un panneau
-  apparaît automatiquement en haut à droite dès qu'un message de sécurité est
-  reçu dans la zone (avis de navigation, exercices, etc.), avec bouton pour
-  l'effacer.
-- **Reconnaissance étendue des navires** : en plus du message type 5
-  (`ShipStaticData`, navires Classe A), l'application comprend le message
-  type 24 (`StaticDataReport`, en deux parties nom/type, navires Classe B) et
-  le message type 19 (`ExtendedClassBPositionReport`, position + nom/type en
-  un seul message), pour attribuer nom et catégorie à un maximum de navires.
+- **Connexion AISStream.io côté serveur** : entrez votre clé API (créée
+  gratuitement sur aisstream.io) une seule fois depuis le navigateur ; le
+  serveur la persiste (`server/config.json`) et maintient la connexion en
+  continu, **indépendamment des onglets/navigateurs ouverts** — fermer la
+  page ou perdre la connexion réseau du navigateur n'interrompt ni le flux
+  AIS côté serveur, ni un enregistrement en cours.
+- **Zone géographique définie par l'utilisateur** : boîte englobante
+  Nord/Sud/Ouest/Est, modifiable à tout moment depuis le menu **🗺️ Carte**
+  (valeurs numériques ou dessin direct sur la carte). Le serveur reconnecte
+  automatiquement AISStream sur la nouvelle zone.
+- **Carte mondiale** avec la zone surveillée encadrée par un rectangle,
+  affichage adaptatif selon le zoom (navires individuels au-delà d'un seuil,
+  agrégés en-deçà), légende dynamique (flotte par catégorie, stations et
+  aides à la navigation visibles).
+- **Enregistrement du flux côté serveur** (page `recording.html`, lien
+  ⏺ Enregistrement) : démarrer/arrêter un enregistrement en **CSV** ou
+  **JSON**, avec l'état courant (idle/en cours, durée, nombre de messages)
+  visible en direct sur toutes les pages ouvertes (indicateur ⏺ REC sur la
+  carte). Les fichiers sont stockés dans `server/recordings/` et restent
+  valides même en cas d'arrêt brutal du serveur (réparation automatique au
+  redémarrage).
+- **Rejeu à vitesse variable (x1 à x20)** : depuis la liste des
+  enregistrements, lancez un rejeu qui s'affiche sur la carte principale
+  exactement comme le direct (mêmes marqueurs, légende, clustering), avec
+  play/pause/stop et réglage de vitesse en direct, synchronisés entre tous
+  les onglets ouverts.
+- **Page « Stations »** (`stations.html`) : liste les stations AIS de base
+  (*Base Station Report*, message type 4) de la zone, avec leurs
+  caractéristiques (EPFD, RAIM, heure UTC) et une estimation du nombre de
+  navires suivis à proximité (l'AIS ne relie pas un message navire à la
+  station qui l'a reçu — c'est une estimation géographique, pas un décompte
+  réel de réception).
+- **Aides à la navigation (AtoN)** et **messages de sécurité** (*Safety
+  Broadcast*) : bouées/phares/balises affichables sur la carte, panneau de
+  messages de sécurité apparaissant automatiquement à réception.
+- **Reconnaissance étendue des navires** : `ShipStaticData` (type 5, Classe
+  A), `StaticDataReport` (type 24, Classe B, deux parties) et
+  `ExtendedClassBPositionReport` (type 19, position + nom/type en un seul
+  message) pour attribuer nom et catégorie à un maximum de navires.
 
 ## Lancer l'application
 
-Aucune dépendance ni build n'est nécessaire : c'est une application statique
-(HTML/CSS/JS + Leaflet, embarqué localement dans `vendor/`, aucun CDN externe
-requis). Servez simplement le dossier avec un serveur statique quelconque,
-par exemple :
+Contrairement aux versions précédentes, l'application **nécessite le serveur
+Node.js** (le navigateur ne se connecte plus jamais directement à
+AISStream.io) :
 
 ```bash
-npx serve .
-# ou
-python3 -m http.server 8080
+cd server
+npm install
+npm start          # ou : node server.js
 ```
 
-Puis ouvrez `http://localhost:8080` (ou le port indiqué) dans votre
-navigateur. Au premier lancement, renseignez votre clé API AISStream.io
-ainsi que la zone géographique (Nord/Sud/Ouest/Est, en degrés décimaux) que
-vous souhaitez surveiller.
+Puis ouvrez `http://localhost:8383` dans votre navigateur (port modifiable
+via la variable d'environnement `PORT`). Le serveur sert directement les
+pages HTML/CSS/JS : pas besoin d'un second serveur statique.
 
-> Le fichier peut aussi être ouvert directement (`index.html`) dans la
-> plupart des navigateurs, mais un serveur local est recommandé pour éviter
-> d'éventuelles restrictions liées au protocole `file://`.
+Au premier lancement, renseignez votre clé API AISStream.io ainsi que la
+zone géographique à surveiller : ces informations sont envoyées au serveur
+et persistées dans `server/config.json` (fichier local, jamais commité —
+voir `.gitignore`). Aux lancements suivants, le serveur reconnecte
+automatiquement AISStream avec la configuration déjà enregistrée.
+
+> Le serveur doit rester **en cours d'exécution** (`node server.js`) pour
+> que le suivi en direct, l'enregistrement et le rejeu fonctionnent. Il peut
+> tourner en local sur votre machine ou sur un serveur/VPS que vous
+> possédez.
 
 ## Structure
 
 ```
-index.html        Page principale (carte, panneau de connexion, légende)
-stations.html      Page listant les stations AIS de base de la zone
-css/style.css      Styles de l'interface
-css/stations.css   Styles spécifiques à la page Stations
-js/config.js       Constantes (seuils de zoom, clés de stockage, etc.)
-js/shipTypes.js    Classification des types de navires AIS et couleurs
-js/ws-utils.js     Décodage partagé des messages WebSocket AISStream
-js/app.js          Logique principale : seule connexion WebSocket réelle,
-                   carte Leaflet, gestion de la zone, clustering, légende,
-                   diffusion des données via BroadcastChannel
-js/stations.js     Page Stations : reçoit les données via BroadcastChannel
-                   (n'ouvre pas de connexion WebSocket propre)
-vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
+index.html          Page principale (carte, panneau de connexion, légende)
+stations.html        Page listant les stations AIS de base de la zone
+recording.html        Page de gestion de l'enregistrement et du rejeu
+css/style.css        Styles de l'interface principale
+css/stations.css      Styles partagés stations/enregistrement (panneaux, tableaux)
+css/recording.css     Styles spécifiques à la page Enregistrement
+js/config.js          Constantes (URL du serveur local, seuils, clés de stockage)
+js/shipTypes.js       Classification des types de navires AIS et couleurs
+js/ws-utils.js        Décodage des messages WebSocket, échappement HTML, parseurs
+js/app.js             Carte principale : connexion au serveur local, rendu
+                      Leaflet, mode rejeu
+js/stations.js        Page Stations (connexion directe au serveur local)
+js/recording.js       Page Enregistrement (connexion + API REST du serveur)
+vendor/               Leaflet + Leaflet.markercluster embarqués (pas de CDN)
+
+server/package.json   Dépendances du serveur (ws)
+server/server.js       Serveur HTTP (sert le frontend + API REST) et WebSocket
+                      (relaie AIS/statut/enregistrement/rejeu à tous les onglets)
+server/aisRelay.js     Unique connexion AISStream persistante, config
+                      (server/config.json), reconnexion automatique
+server/recorder.js     Enregistrement CSV/JSON incrémental, métadonnées,
+                      réparation après arrêt brutal
+server/replay.js        Moteur de rejeu (vitesse x1-x20, play/pause/stop)
+server/recordings/      Fichiers enregistrés (ignorés par git)
 ```
+
+## Architecture : pourquoi un serveur ?
+
+AISStream ferme les connexions de façon abrupte (code `1006`, sans raison)
+dès que **plusieurs connexions WebSocket utilisent la même clé API en même
+temps** — ce qui arrivait dès que deux onglets se connectaient chacun
+directement. Le serveur local résout ce problème définitivement : il est le
+seul à ouvrir une connexion à AISStream (`server/aisRelay.js`), et la relaie
+à tous les onglets navigateur connectés (`index.html`, `stations.html`,
+`recording.html`) via son propre WebSocket (`ws://.../ws`). Cette même
+architecture permet :
+
+- l'**enregistrement** indépendant du navigateur (le serveur écrit sur
+  disque, que des onglets soient ouverts ou non) ;
+- le **rejeu** partagé et synchronisé entre tous les onglets (statut,
+  progression et vitesse diffusés à tous) ;
+- une **reprise automatique** après un redémarrage du serveur (la
+  configuration API key/zone est persistée, la connexion AISStream se
+  rétablit seule).
 
 ## Notes sur AISStream.io
 
-- Le message de souscription envoyé à l'ouverture du WebSocket reprend la
-  zone saisie par l'utilisateur, par exemple :
+- Le message de souscription envoyé par le serveur à l'ouverture de la
+  connexion AISStream :
   ```json
   {
     "APIKey": "VOTRE_CLE",
@@ -117,18 +138,9 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
     ]
   }
   ```
-- **Une seule connexion WebSocket par session de navigation.** AISStream
-  ferme les connexions de façon abrupte (code `1006`, sans raison) dès que
-  plusieurs onglets ouvrent chacun leur propre connexion avec la même clé
-  API. La page principale (`index.html`) est donc la seule à appeler
-  `new WebSocket(...)` ; elle diffuse chaque message reçu, changement de
-  statut et changement de zone via `BroadcastChannel("aistracker")`. La page
-  Stations s'abonne à ce canal au lieu d'ouvrir sa propre connexion, et
-  affiche un message si aucune page principale connectée n'est détectée
-  après quelques secondes.
 - `PositionReport` / `StandardClassBPositionReport` fournissent la position,
-  la vitesse (SOG), le cap (COG) et le cap vrai (heading). Les navires Classe B
-  (`StandardClassBPositionReport` / `ExtendedClassBPositionReport`) ne
+  la vitesse (SOG), le cap (COG) et le cap vrai (heading). Les navires Classe
+  B (`StandardClassBPositionReport` / `ExtendedClassBPositionReport`) ne
   transmettent jamais de statut de navigation (norme AIS) : l'application
   affiche alors « Non transmis (Classe B) » plutôt qu'un générique « inconnu »
   qui laisserait penser à une donnée manquante.
@@ -144,8 +156,19 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
   des bouées/phares/balises AIS de la zone.
 - `SafetyBroadcastMessage` (type 14) fournit le texte des messages de
   sécurité diffusés dans la zone. Provenant d'une diffusion externe non
-  fiable, ce texte (ainsi que les noms de navires/stations) est systématiquement
-  échappé avant affichage (voir `escapeHtml` dans `js/ws-utils.js`).
-- La clé API n'est jamais envoyée à un serveur tiers : elle est utilisée
-  uniquement pour la connexion WebSocket directe entre votre navigateur et
-  AISStream.io.
+  fiable, ce texte (ainsi que les noms de navires/stations) est
+  systématiquement échappé avant affichage (voir `escapeHtml` dans
+  `js/ws-utils.js`).
+- La clé API n'est envoyée qu'au serveur local (jamais à un tiers), qui
+  l'utilise pour l'unique connexion WebSocket vers AISStream.io.
+
+## Enregistrements (CSV / JSON)
+
+- **JSON** : tableau d'objets `{ "t": <timestamp ms>, "data": <message AIS
+  original> }`, un par message reçu.
+- **CSV** : colonnes usuelles (horodatage, type de message, MMSI, position,
+  vitesse/cap, nom, type) plus une colonne `raw_json` contenant le message
+  AIS complet, pour ne perdre aucune information.
+- Chaque enregistrement a un fichier `<id>.meta.json` associé (format, heure
+  de début/fin, nombre de messages, complétude) utilisé pour la liste, le
+  téléchargement et le rejeu.

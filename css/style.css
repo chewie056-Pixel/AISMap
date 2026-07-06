@@ -225,6 +225,41 @@ button:hover {
   pointer-events: none;
 }
 
+.replay-banner {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #2E86DE;
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 10px 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.replay-banner button {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 5px 10px;
+  font-size: 12px;
+}
+.replay-banner button:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.recording-indicator {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ff6b6b;
+  animation: pulse 1.2s infinite;
+}
+
 .nav-link {
   display: inline-flex;
   align-items: center;

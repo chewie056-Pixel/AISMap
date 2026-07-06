@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIS Tracker — Enregistrement</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/stations.css" />
+<link rel="stylesheet" href="css/recording.css" />
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <h1>AIS Tracker <small>— enregistrement &amp; rejeu</small></h1>
+  </div>
+
+  <div id="status" class="status status-disconnected">
+    <span class="status-led"></span>
+    <span id="status-text">Déconnecté</span>
+  </div>
+
+  <div id="conn-controls">
+    <a class="nav-link" href="index.html" title="Retour à la carte">← Carte</a>
+  </div>
+</header>
+
+<main id="stations-page">
+  <p class="stations-intro">
+    L'enregistrement tourne côté serveur : il continue même si vous fermez
+    cette page ou perdez la connexion réseau, et survit à un redémarrage du
+    serveur (reprise automatique de la configuration AISStream).
+  </p>
+
+  <div id="recording-no-config" class="panel hidden">
+    <p>Aucune clé API ou zone géographique n'est configurée sur le serveur.</p>
+    <a href="index.html" class="btn-primary-link">Configurer sur la page principale</a>
+  </div>
+
+  <section id="recording-section" class="panel hidden">
+    <h3>Enregistrement</h3>
+
+    <div id="recording-idle-controls">
+      <div class="format-choice">
+        <label><input type="radio" name="format" value="json" checked /> JSON</label>
+        <label><input type="radio" name="format" value="csv" /> CSV</label>
+      </div>
+      <button id="btn-recording-start" class="btn-primary-link">⏺ Démarrer l'enregistrement</button>
+    </div>
+
+    <div id="recording-active-controls" class="hidden">
+      <div class="recording-live-info">
+        <span class="rec-dot">⏺</span>
+        Enregistrement <strong id="recording-format-label"></strong> en cours depuis
+        <strong id="recording-duration"></strong>
+        — <span id="recording-message-count">0</span> message(s)
+      </div>
+      <button id="btn-recording-stop" class="btn-stop">⏹ Arrêter l'enregistrement</button>
+    </div>
+  </section>
+
+  <section id="recordings-list-section" class="panel hidden">
+    <h3>Enregistrements disponibles</h3>
+    <div class="stations-table-wrap">
+    <table id="recordings-table">
+      <thead>
+        <tr>
+          <th>Début</th>
+          <th>Format</th>
+          <th>Messages</th>
+          <th>Taille</th>
+          <th>Statut</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="recordings-tbody">
+        <tr id="recordings-empty-row">
+          <td colspan="6">Aucun enregistrement pour le moment.</td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>
+
+  <section id="replay-section" class="panel hidden">
+    <h3>Rejeu</h3>
+    <div class="replay-current">
+      Enregistrement : <strong id="replay-current-label"></strong>
+      · <span id="replay-current-progress"></span>
+    </div>
+    <div class="replay-controls">
+      <label for="replay-speed-range">Vitesse : x<span id="replay-speed-value">1</span></label>
+      <input type="range" id="replay-speed-range" min="1" max="20" step="1" value="1" />
+      <div class="replay-buttons">
+        <button id="btn-replay-pause">⏸ Pause</button>
+        <button id="btn-replay-resume" class="hidden">▶ Reprendre</button>
+        <button id="btn-replay-stop-2" class="btn-stop">⏹ Arrêter le rejeu</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/ws-utils.js"></script>
+<script src="js/recording.js"></script>
+</body>
+</html>

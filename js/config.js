@@ -1,6 +1,10 @@
 // Configuration globale de l'application AIS Tracker
 
-const AIS_STREAM_URL = "wss://stream.aisstream.io/v0/stream";
+// Le navigateur ne se connecte plus directement à AISStream.io : c'est le
+// serveur local (server/server.js) qui détient l'unique connexion AISStream
+// (persistante, indépendante de tout onglet ouvert) et la relaie ici via
+// WebSocket, en plus de gérer l'enregistrement et le rejeu.
+const SERVER_WS_URL = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws";
 
 // Zone pré-remplie au premier lancement ; entièrement modifiable par
 // l'utilisateur avant de se connecter (voir le formulaire de connexion).
@@ -32,8 +36,5 @@ const STORAGE_KEY_SHOW_AIDS = "aisstream_show_aids";
 const RECONNECT_BASE_DELAY_MS = 2000;
 const RECONNECT_MAX_DELAY_MS = 30000;
 
-// AISStream ferme la connexion (souvent abruptement, code 1006) si plusieurs
-// onglets ouvrent chacun leur propre WebSocket avec la même clé API. Une
-// seule page (la page principale) détient donc la connexion réelle ; les
-// autres pages (Stations) reçoivent les données via ce canal partagé.
-const AIS_BROADCAST_CHANNEL = "aistracker";
+const MIN_REPLAY_SPEED = 1;
+const MAX_REPLAY_SPEED = 20;

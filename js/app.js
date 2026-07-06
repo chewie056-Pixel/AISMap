@@ -1,12 +1,13 @@
 // AIS Tracker
-// Connexion directe (WebSocket navigateur) à AISStream.io, affichage Leaflet.
+// Le navigateur se connecte au serveur local (server/server.js), qui détient
+// l'unique connexion AISStream persistante (indépendante de tout onglet) et
+// gère l'enregistrement/le rejeu. Affichage Leaflet.
 
 let map, markerClusterGroup, zoneRectangle;
-let ws = null;
-let manualDisconnect = false;
-let reconnectAttempts = 0;
-let reconnectTimer = null;
-let currentApiKey = null;
+let serverWs = null;
+let serverReconnectAttempts = 0;
+let serverReconnectTimer = null;
+let serverConfigured = false;
 let currentZone = { ...DEFAULT_ZONE }; // modifiable par l'utilisateur avant connexion
 let legendDirty = true;
 let messageCount = 0;
@@ -20,6 +21,7 @@ let aidsLayerGroup;
 let drawingZone = false;
 let drawStartLatLng = null;
 let drawRectangle = null;
+let replayModeActive = false;
 
 const MAX_SAFETY_MESSAGES = 20;
 
@@ -27,21 +29,6 @@ const vessels = new Map(); // mmsi -> vessel state
 const stations = new Map(); // mmsi -> station state (Base Station Report)
 const aidsToNav = new Map(); // mmsi -> aide à la navigation (AtoN, type 21)
 const safetyMessages = []; // messages de sécurité (type 14), le plus récent en premier
-
-// Cette page détient la seule connexion WebSocket réelle. Elle diffuse les
-// données/statut aux autres pages (Stations) via ce canal, pour éviter que
-// plusieurs onglets n'ouvrent chacun leur propre connexion (AISStream ferme
-// alors les connexions de façon abrupte).
-const broadcastChannel = new BroadcastChannel(AIS_BROADCAST_CHANNEL);
-let lastStatusState = "disconnected";
-let lastStatusText = "Déconnecté";
-
-broadcastChannel.onmessage = (evt) => {
-  if (evt.data?.type === "request-status") {
-    broadcastChannel.postMessage({ type: "status", state: lastStatusState, text: lastStatusText });
-    if (currentZone) broadcastChannel.postMessage({ type: "zone", zone: currentZone });
-  }
-};
 
 // --- DOM references ---
 const els = {};
@@ -57,7 +44,7 @@ function init() {
   initMap();
   wireUi();
   updateZoomThresholdLabel();
-  setStatus("disconnected", "Déconnecté");
+  setStatus("disconnected", "Connexion au serveur local…");
 
   setInterval(() => {
     if (legendDirty) {
@@ -67,12 +54,7 @@ function init() {
   }, 2000);
   setInterval(removeStaleVessels, STALE_CHECK_INTERVAL_MS);
 
-  const storedKey = localStorage.getItem(STORAGE_KEY_API);
-  if (storedKey && currentZone) {
-    connect(storedKey);
-  } else {
-    showLoginModal();
-  }
+  connectToServer();
 }
 
 function cacheDomRefs() {
@@ -117,6 +99,13 @@ function cacheDomRefs() {
   els.safetyList = document.getElementById("safety-list");
   els.safetyCount = document.getElementById("safety-count");
   els.btnSafetyClear = document.getElementById("btn-safety-clear");
+
+  els.recordingIndicator = document.getElementById("recording-indicator");
+  els.replayBanner = document.getElementById("replay-banner");
+  els.replayBannerLabel = document.getElementById("replay-banner-label");
+  els.replayBannerProgress = document.getElementById("replay-banner-progress");
+  els.replayBannerSpeed = document.getElementById("replay-banner-speed");
+  els.btnReplayExit = document.getElementById("btn-replay-exit");
 }
 
 function updateZoomThresholdLabel() {
@@ -268,8 +257,11 @@ function parseZoneInputs(elNorth, elSouth, elWest, elEast) {
 // --- UI wiring ---
 
 function wireUi() {
-  els.btnConnect.addEventListener("click", showLoginModal);
+  els.btnConnect.addEventListener("click", handleConnectClick);
   els.btnDisconnect.addEventListener("click", disconnect);
+  els.btnReplayExit.addEventListener("click", () => {
+    fetch("/api/replay/stop", { method: "POST" });
+  });
 
   els.btnMapMenu.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -344,7 +336,6 @@ function handleModalConnect() {
   currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
   drawZoneRectangle(currentZone);
-  broadcastChannel.postMessage({ type: "zone", zone: currentZone });
   map.fitBounds(zoneRectangle.getBounds(), { padding: [40, 40] });
 
   if (els.rememberKey.checked) {
@@ -353,7 +344,15 @@ function handleModalConnect() {
     localStorage.removeItem(STORAGE_KEY_API);
   }
   hideLoginModal();
-  connect(key);
+  sendToServer({ type: "configure", apiKey: key, zone: currentZone });
+}
+
+function handleConnectClick() {
+  if (serverConfigured) {
+    sendToServer({ type: "connect" });
+  } else {
+    showLoginModal();
+  }
 }
 
 function showLoginError(message) {
@@ -381,15 +380,14 @@ function applyZoneFromInputs() {
 }
 
 // Définit la nouvelle zone active, la persiste, redessine le rectangle et
-// reconnecte le flux AISStream dessus si une connexion est déjà en cours.
+// demande au serveur de reconnecter le flux AISStream dessus si déjà configuré.
 function applyNewZone(zone) {
   currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
   drawZoneRectangle(currentZone);
-  broadcastChannel.postMessage({ type: "zone", zone: currentZone });
 
-  if (currentApiKey) {
-    reconnectWithCurrentZone();
+  if (serverConfigured) {
+    sendToServer({ type: "set-zone", zone: currentZone });
   }
 }
 
@@ -488,64 +486,89 @@ function loadZoneFromStorage() {
   }
 }
 
-// --- Connexion WebSocket AISStream ---
+// --- Connexion au serveur local (relais AISStream + enregistrement/rejeu) ---
 
-function connect(apiKey) {
-  manualDisconnect = false;
-  currentApiKey = apiKey;
-  setStatus("connecting", "Connexion en cours…");
-
+function connectToServer() {
+  let socket;
   try {
-    ws = new WebSocket(AIS_STREAM_URL);
+    socket = new WebSocket(SERVER_WS_URL);
   } catch {
-    setStatus("error", "Impossible d'ouvrir la connexion WebSocket");
+    setStatus("error", "Impossible de joindre le serveur local");
+    scheduleServerReconnect();
     return;
   }
+  serverWs = socket;
 
-  ws.onopen = () => {
-    reconnectAttempts = 0;
-    messageCount = 0;
-    lastStatusUpdate = 0;
-    ws.send(
-      JSON.stringify({
-        APIKey: apiKey,
-        BoundingBoxes: [zoneBounds(currentZone)],
-        FilterMessageTypes: [
-          "PositionReport",
-          "StandardClassBPositionReport",
-          "ExtendedClassBPositionReport",
-          "ShipStaticData",
-          "StaticDataReport",
-          "BaseStationReport",
-          "AidsToNavigationReport",
-          "SafetyBroadcastMessage",
-        ],
-      })
-    );
-    setStatus("connected", "Connecté — en attente de données…");
+  socket.onopen = () => {
+    serverReconnectAttempts = 0;
   };
 
-  ws.onmessage = (evt) => readAisMessage(evt, onAisData);
+  socket.onmessage = (evt) => readAisMessage(evt, handleServerMessage);
 
-  ws.onerror = (evt) => {
-    console.error("AIS: erreur WebSocket", evt);
-    setStatus("error", "Erreur de connexion");
+  socket.onerror = (evt) => {
+    console.error("Serveur local : erreur WebSocket", evt);
   };
 
-  ws.onclose = (evt) => {
-    console.warn("AIS: connexion fermée", {
-      code: evt.code,
-      reason: evt.reason,
-      wasClean: evt.wasClean,
-    });
-    if (manualDisconnect) {
-      setStatus("disconnected", "Déconnecté");
-      return;
-    }
-    const codeInfo = evt.code ? ` (code ${evt.code}${evt.reason ? " — " + evt.reason : ""})` : "";
-    setStatus("error", `Connexion perdue${codeInfo} — nouvelle tentative…`);
-    scheduleReconnect();
+  socket.onclose = () => {
+    serverWs = null;
+    setStatus("error", "Connexion au serveur local perdue — nouvelle tentative…");
+    scheduleServerReconnect();
   };
+}
+
+function scheduleServerReconnect() {
+  serverReconnectAttempts++;
+  const delay = Math.min(
+    RECONNECT_BASE_DELAY_MS * 2 ** (serverReconnectAttempts - 1),
+    RECONNECT_MAX_DELAY_MS
+  );
+  clearTimeout(serverReconnectTimer);
+  serverReconnectTimer = setTimeout(connectToServer, delay);
+}
+
+function sendToServer(msg) {
+  if (serverWs && serverWs.readyState === WebSocket.OPEN) {
+    serverWs.send(JSON.stringify(msg));
+  } else {
+    console.warn("Serveur local injoignable, message ignoré", msg);
+  }
+}
+
+// Arrête la connexion AISStream côté serveur (partagée par tous les onglets).
+// Ne ferme pas la connexion de ce navigateur au serveur local lui-même.
+function disconnect() {
+  sendToServer({ type: "disconnect" });
+  clearAllVessels();
+}
+
+function handleServerMessage(msg) {
+  switch (msg.type) {
+    case "status":
+      setStatus(msg.state, msg.text);
+      break;
+    case "config":
+      serverConfigured = msg.configured;
+      if (msg.zone) {
+        currentZone = msg.zone;
+        drawZoneRectangle(currentZone);
+      }
+      if (!serverConfigured) showLoginModal();
+      break;
+    case "data":
+      if (!replayModeActive) onAisData(msg.payload);
+      break;
+    case "recording-status":
+      els.recordingIndicator.classList.toggle("hidden", msg.state !== "recording");
+      break;
+    case "replay-status":
+      handleReplayStatus(msg);
+      break;
+    case "replay-data":
+      if (replayModeActive) handleMessage(msg.payload);
+      break;
+    default:
+      break;
+  }
 }
 
 function onAisData(data) {
@@ -554,7 +577,6 @@ function onAisData(data) {
     // Aide au diagnostic : affiche la forme brute des premiers messages reçus.
     console.debug("AIS: message reçu", data);
   }
-  broadcastChannel.postMessage({ type: "data", payload: data });
   handleMessage(data);
 
   const now = Date.now();
@@ -567,35 +589,23 @@ function onAisData(data) {
   }
 }
 
-function scheduleReconnect() {
-  reconnectAttempts++;
-  const delay = Math.min(
-    RECONNECT_BASE_DELAY_MS * 2 ** (reconnectAttempts - 1),
-    RECONNECT_MAX_DELAY_MS
-  );
-  clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => {
-    if (!manualDisconnect && currentApiKey) connect(currentApiKey);
-  }, delay);
-}
+function handleReplayStatus(status) {
+  const wasActive = replayModeActive;
+  replayModeActive = status.state !== "idle";
 
-function disconnect() {
-  manualDisconnect = true;
-  clearTimeout(reconnectTimer);
-  if (ws) {
-    ws.close();
-    ws = null;
+  if (replayModeActive && !wasActive) {
+    clearAllVessels(); // bascule direct -> rejeu : on repart d'une carte vide
   }
-  clearAllVessels();
-  setStatus("disconnected", "Déconnecté");
-}
+  if (!replayModeActive && wasActive) {
+    clearAllVessels(); // fin de rejeu : la vue live repeuplera au fil des données
+  }
 
-function reconnectWithCurrentZone() {
-  manualDisconnect = true;
-  clearTimeout(reconnectTimer);
-  if (ws) ws.close();
-  clearAllVessels();
-  connect(currentApiKey);
+  els.replayBanner.classList.toggle("hidden", !replayModeActive);
+  if (replayModeActive) {
+    els.replayBannerLabel.textContent = status.recordingId || "";
+    els.replayBannerProgress.textContent = `${status.index}/${status.total}`;
+    els.replayBannerSpeed.textContent = status.speed;
+  }
 }
 
 function setStatus(state, text) {
@@ -604,23 +614,11 @@ function setStatus(state, text) {
   const busy = state === "connected" || state === "connecting";
   els.btnConnect.classList.toggle("hidden", busy);
   els.btnDisconnect.classList.toggle("hidden", !busy);
-
-  lastStatusState = state;
-  lastStatusText = text;
-  broadcastChannel.postMessage({ type: "status", state, text });
 }
 
 // --- Traitement des messages AIS ---
 
 function handleMessage(data) {
-  if (data.error) {
-    console.error("AIS: erreur reçue du serveur", data.error);
-    showLoginError(data.error);
-    setStatus("error", data.error);
-    disconnect();
-    return;
-  }
-
   const type = data.MessageType;
 
   if (data.Message?.BaseStationReport) {

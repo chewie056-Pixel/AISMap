@@ -1,50 +1,24 @@
 // Page "Stations" — liste les stations AIS de base (Base Station Report,
-// message AIS type 4) qui émettent dans la zone configurée sur la page
-// principale.
-//
-// Cette page n'ouvre PAS sa propre connexion WebSocket : AISStream ferme les
-// connexions de façon abrupte (code 1006) dès que plusieurs onglets ouvrent
-// chacun une connexion avec la même clé API. Elle reçoit donc les données en
-// direct via BroadcastChannel, relayées par la page principale (index.html),
-// qui doit être ouverte et connectée dans un autre onglet.
+// message AIS type 4) qui émettent dans la zone surveillée par le serveur
+// local. Se connecte directement au serveur (comme la page principale) :
+// aucune dépendance à un autre onglet ouvert.
 
+let serverWs = null;
+let serverReconnectAttempts = 0;
+let serverReconnectTimer = null;
 let renderDirty = false;
-let receivedAnyBroadcast = false;
 
 const stations = new Map(); // mmsi -> { mmsi, lat, lon, lastSeen, ... }
 const vesselPositions = new Map(); // mmsi -> { lat, lon } (position seule, pour l'estimation de proximité)
 
 const els = {};
-const broadcastChannel = new BroadcastChannel(AIS_BROADCAST_CHANNEL);
 
 document.addEventListener("DOMContentLoaded", init);
 
 function init() {
   cacheDomRefs();
   els.proximityRadius.textContent = STATION_PROXIMITY_RADIUS_KM;
-
-  const zone = loadZone();
-  if (!localStorage.getItem(STORAGE_KEY_API) || !zone) {
-    els.noConfig.classList.remove("hidden");
-    els.content.classList.add("hidden");
-    els.noSession.classList.add("hidden");
-    return;
-  }
-
-  els.noConfig.classList.add("hidden");
-  els.content.classList.remove("hidden");
-  showZoneSummary(zone);
-  setStatus("connecting", "En attente de la page principale…");
-
-  broadcastChannel.onmessage = (evt) => handleBroadcast(evt.data);
-  broadcastChannel.postMessage({ type: "request-status" });
-
-  setTimeout(() => {
-    if (!receivedAnyBroadcast) {
-      els.noSession.classList.remove("hidden");
-      setStatus("disconnected", "Aucune session active");
-    }
-  }, 4000);
+  connectToServer();
 
   setInterval(() => {
     if (renderDirty) {
@@ -58,7 +32,6 @@ function cacheDomRefs() {
   els.status = document.getElementById("status");
   els.statusText = document.getElementById("status-text");
   els.noConfig = document.getElementById("stations-no-config");
-  els.noSession = document.getElementById("stations-no-session");
   els.content = document.getElementById("stations-content");
   els.zoneNorth = document.getElementById("zone-summary-north");
   els.zoneSouth = document.getElementById("zone-summary-south");
@@ -67,20 +40,7 @@ function cacheDomRefs() {
   els.totalCount = document.getElementById("stations-total-count");
   els.tbody = document.getElementById("stations-tbody");
   els.emptyRow = document.getElementById("stations-empty-row");
-  els.error = document.getElementById("stations-error");
   els.proximityRadius = document.getElementById("proximity-radius");
-}
-
-function loadZone() {
-  const raw = localStorage.getItem(STORAGE_KEY_ZONE);
-  if (!raw) return null;
-  try {
-    const zone = JSON.parse(raw);
-    if (zone.north > zone.south && zone.east > zone.west) return zone;
-  } catch {
-    // ignore corrupted value
-  }
-  return null;
 }
 
 function showZoneSummary(zone) {
@@ -95,29 +55,65 @@ function setStatus(state, text) {
   els.statusText.textContent = text;
 }
 
-function handleBroadcast(msg) {
-  if (!msg) return;
-  receivedAnyBroadcast = true;
-  els.noSession.classList.add("hidden");
+// --- Connexion au serveur local ---
 
-  if (msg.type === "status") {
-    setStatus(msg.state, msg.text);
-  } else if (msg.type === "zone") {
-    showZoneSummary(msg.zone);
-  } else if (msg.type === "data") {
-    handleData(msg.payload);
+function connectToServer() {
+  let socket;
+  try {
+    socket = new WebSocket(SERVER_WS_URL);
+  } catch {
+    setStatus("error", "Impossible de joindre le serveur local");
+    scheduleServerReconnect();
+    return;
+  }
+  serverWs = socket;
+
+  socket.onopen = () => {
+    serverReconnectAttempts = 0;
+  };
+
+  socket.onmessage = (evt) => readAisMessage(evt, handleServerMessage);
+
+  socket.onerror = (evt) => {
+    console.error("Serveur local : erreur WebSocket", evt);
+  };
+
+  socket.onclose = () => {
+    serverWs = null;
+    setStatus("error", "Connexion au serveur local perdue — nouvelle tentative…");
+    scheduleServerReconnect();
+  };
+}
+
+function scheduleServerReconnect() {
+  serverReconnectAttempts++;
+  const delay = Math.min(
+    RECONNECT_BASE_DELAY_MS * 2 ** (serverReconnectAttempts - 1),
+    RECONNECT_MAX_DELAY_MS
+  );
+  clearTimeout(serverReconnectTimer);
+  serverReconnectTimer = setTimeout(connectToServer, delay);
+}
+
+function handleServerMessage(msg) {
+  switch (msg.type) {
+    case "status":
+      setStatus(msg.state, msg.text);
+      break;
+    case "config":
+      els.noConfig.classList.toggle("hidden", msg.configured);
+      els.content.classList.toggle("hidden", !msg.configured);
+      if (msg.zone) showZoneSummary(msg.zone);
+      break;
+    case "data":
+      handleData(msg.payload);
+      break;
+    default:
+      break;
   }
 }
 
 function handleData(data) {
-  if (data.error) {
-    console.error("AIS: erreur reçue du serveur", data.error);
-    els.error.textContent = data.error;
-    els.error.classList.remove("hidden");
-    setStatus("error", data.error);
-    return;
-  }
-
   const stationReport = parseBaseStationReport(data);
   if (stationReport) {
     stations.set(stationReport.mmsi, { ...stationReport, lastSeen: Date.now() });

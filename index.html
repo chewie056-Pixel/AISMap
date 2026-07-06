@@ -18,10 +18,18 @@
   Cliquez-glissez sur la carte pour dessiner la nouvelle zone · Échap pour annuler
 </div>
 
+<div id="replay-banner" class="replay-banner hidden">
+  ▶ Rejeu : <strong id="replay-banner-label"></strong>
+  · <span id="replay-banner-progress"></span>
+  · vitesse x<span id="replay-banner-speed"></span>
+  <button id="btn-replay-exit">Quitter le rejeu</button>
+</div>
+
 <header id="topbar">
   <div class="brand">
     <span class="brand-dot"></span>
     <h1>AIS Tracker <small>— suivi maritime en direct</small></h1>
+    <span id="recording-indicator" class="recording-indicator hidden" title="Un enregistrement est en cours sur le serveur">⏺ REC</span>
   </div>
 
   <div id="status" class="status status-disconnected">
@@ -66,6 +74,7 @@
     <button id="btn-connect">Se connecter</button>
     <button id="btn-disconnect" class="hidden">Se déconnecter</button>
     <a id="btn-stations-link" class="nav-link" href="stations.html" title="Voir les stations AIS émettant dans la zone">📡 Stations</a>
+    <a id="btn-recording-link" class="nav-link" href="recording.html" title="Gérer l'enregistrement et le rejeu du flux AIS">⏺ Enregistrement</a>
   </div>
 </header>
 
