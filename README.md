@@ -27,6 +27,13 @@ définie par l'utilisateur.
   total de navires actuellement dans la vue.
 - Reconnexion automatique avec backoff exponentiel en cas de coupure, et
   purge des navires n'ayant pas émis depuis 15 minutes.
+- **Agrégation activable/désactivable** : un interrupteur dans le bandeau
+  permet de forcer l'affichage individuel de tous les navires, quel que soit
+  le zoom.
+- **Page « Stations »** (`stations.html`, lien 📡 dans le bandeau) : liste les
+  stations AIS de base (balises côtières/terrestres, messages *Base Station
+  Report*) qui émettent dans la zone configurée sur la page principale.
+  Réutilise la clé API et la zone déjà enregistrées.
 
 ## Lancer l'application
 
@@ -54,11 +61,15 @@ vous souhaitez surveiller.
 
 ```
 index.html        Page principale (carte, panneau de connexion, légende)
+stations.html      Page listant les stations AIS de base de la zone
 css/style.css      Styles de l'interface
+css/stations.css   Styles spécifiques à la page Stations
 js/config.js       Constantes (seuils de zoom, clés de stockage, etc.)
 js/shipTypes.js    Classification des types de navires AIS et couleurs
+js/ws-utils.js     Décodage partagé des messages WebSocket AISStream
 js/app.js          Logique principale : WebSocket AISStream, carte Leaflet,
                    gestion de la zone, clustering, légende
+js/stations.js     Logique de la page Stations
 vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
 ```
 
@@ -70,13 +81,17 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
   {
     "APIKey": "VOTRE_CLE",
     "BoundingBoxes": [[[SUD, OUEST], [NORD, EST]]],
-    "FilterMessageTypes": ["PositionReport", "ShipStaticData"]
+    "FilterMessageTypes": ["PositionReport", "StandardClassBPositionReport", "ShipStaticData"]
   }
   ```
-- `PositionReport` fournit la position, la vitesse (SOG), le cap (COG) et le
-  cap vrai (heading).
+  La page Stations ouvre une connexion séparée filtrée sur
+  `["BaseStationReport"]` pour la même zone.
+- `PositionReport` / `StandardClassBPositionReport` fournissent la position,
+  la vitesse (SOG), le cap (COG) et le cap vrai (heading).
 - `ShipStaticData` fournit le nom et le type de navire (code AIS 0–99), utilisé
   pour la catégorisation et la légende.
+- `BaseStationReport` (message AIS type 4) fournit la position des stations
+  de base émettant dans la zone.
 - La clé API n'est jamais envoyée à un serveur tiers : elle est utilisée
   uniquement pour la connexion WebSocket directe entre votre navigateur et
   AISStream.io.

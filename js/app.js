@@ -323,17 +323,7 @@ function connect(apiKey) {
     setStatus("connected", "Connecté — en attente de données…");
   };
 
-  ws.onmessage = (evt) => {
-    // AISStream envoie parfois les frames en binaire : evt.data peut être une
-    // chaîne, un Blob ou un ArrayBuffer selon le navigateur/serveur.
-    if (typeof evt.data === "string") {
-      processRawMessage(evt.data);
-    } else if (evt.data instanceof Blob) {
-      evt.data.text().then(processRawMessage);
-    } else if (evt.data instanceof ArrayBuffer) {
-      processRawMessage(new TextDecoder("utf-8").decode(evt.data));
-    }
-  };
+  ws.onmessage = (evt) => readAisMessage(evt, onAisData);
 
   ws.onerror = () => {
     setStatus("error", "Erreur de connexion");
@@ -349,14 +339,7 @@ function connect(apiKey) {
   };
 }
 
-function processRawMessage(raw) {
-  let data;
-  try {
-    data = JSON.parse(raw);
-  } catch (e) {
-    console.warn("AIS: message non-JSON ignoré", raw, e);
-    return;
-  }
+function onAisData(data) {
   messageCount++;
   if (messageCount <= 3) {
     // Aide au diagnostic : affiche la forme brute des premiers messages reçus.

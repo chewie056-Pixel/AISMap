@@ -1,0 +1,74 @@
+html, body {
+  background: #f4f6f8;
+  min-height: 100%;
+}
+
+#stations-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 84px 20px 40px;
+}
+
+.stations-intro {
+  font-size: 14px;
+  color: #445;
+  line-height: 1.5;
+  background: white;
+  border-radius: 10px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+#stations-no-config {
+  position: static;
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+#stations-content {
+  margin-top: 16px;
+}
+
+.stations-zone-summary {
+  font-size: 13px;
+  color: #556;
+  margin-bottom: 10px;
+}
+
+.stations-count {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+#stations-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+#stations-table th,
+#stations-table td {
+  text-align: left;
+  padding: 9px 14px;
+  font-size: 13px;
+  border-bottom: 1px solid #edf0f3;
+}
+
+#stations-table th {
+  background: #eef1f5;
+  font-weight: 600;
+  color: #334;
+}
+
+#stations-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+#stations-empty-row td {
+  color: #889;
+  font-style: italic;
+}

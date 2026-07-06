@@ -143,6 +143,22 @@ button:hover {
   background: rgba(255, 255, 255, 0.22);
 }
 
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  transition: background 0.15s ease;
+}
+.nav-link:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
 /* --- Panels (legend, zone) --- */
 
 .panel {

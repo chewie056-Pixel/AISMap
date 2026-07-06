@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIS Tracker — Stations</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="stylesheet" href="css/stations.css" />
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <h1>AIS Tracker <small>— stations de la zone</small></h1>
+  </div>
+
+  <div id="status" class="status status-disconnected">
+    <span class="status-led"></span>
+    <span id="status-text">Déconnecté</span>
+  </div>
+
+  <div id="conn-controls">
+    <a class="nav-link" href="index.html" title="Retour à la carte">← Carte</a>
+  </div>
+</header>
+
+<main id="stations-page">
+  <p class="stations-intro">
+    Liste des stations AIS de base (balises côtières/terrestres, messages
+    <em>Base Station Report</em>) qui émettent dans la zone géographique
+    configurée sur la page principale. Ces stations font partie du réseau qui
+    alimente le flux AIS reçu pour cette zone.
+  </p>
+
+  <div id="stations-no-config" class="panel hidden">
+    Aucune clé API ou zone géographique n'est configurée. Rendez-vous sur la
+    <a href="index.html">page principale</a> pour vous connecter et définir une
+    zone avant de consulter les stations.
+  </div>
+
+  <div id="stations-content" class="hidden">
+    <div class="stations-zone-summary">
+      Zone surveillée : Nord <span id="zone-summary-north"></span> ·
+      Sud <span id="zone-summary-south"></span> ·
+      Ouest <span id="zone-summary-west"></span> ·
+      Est <span id="zone-summary-east"></span>
+    </div>
+
+    <div class="stations-count">
+      <span id="stations-total-count">0</span> station(s) détectée(s)
+    </div>
+
+    <table id="stations-table">
+      <thead>
+        <tr>
+          <th>MMSI</th>
+          <th>Latitude</th>
+          <th>Longitude</th>
+          <th>Dernière réception</th>
+        </tr>
+      </thead>
+      <tbody id="stations-tbody">
+        <tr id="stations-empty-row">
+          <td colspan="4">En attente de données…</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p id="stations-error" class="login-error hidden"></p>
+  </div>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/ws-utils.js"></script>
+<script src="js/stations.js"></script>
+</body>
+</html>
