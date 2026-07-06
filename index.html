@@ -26,6 +26,10 @@
   </div>
 
   <div id="conn-controls">
+    <label class="toggle-row" title="Regrouper les navires proches en un seul indicateur numérique selon le zoom">
+      <input type="checkbox" id="aggregation-toggle" checked />
+      Agrégation
+    </label>
     <button id="btn-connect">Se connecter</button>
     <button id="btn-disconnect" class="hidden">Se déconnecter</button>
     <button id="btn-recenter" title="Recentrer sur la zone">🔍 Zone</button>
@@ -80,7 +84,7 @@
     <span id="legend-total-count">0</span> navire(s) dans la vue
   </div>
   <ul id="legend-list"></ul>
-  <div class="legend-footnote">
+  <div class="legend-footnote" id="legend-footnote">
     Zoom ≥ <span id="legend-zoom-threshold"></span> : navires individuels · en-deçà : agrégats
   </div>
   <div class="legend-updated">Mis à jour : <span id="legend-updated-at">—</span></div>

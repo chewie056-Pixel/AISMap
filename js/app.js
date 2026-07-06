@@ -12,6 +12,7 @@ let legendDirty = true;
 let messageCount = 0;
 let visibleVesselCount = 0;
 let lastStatusUpdate = 0;
+let aggregationEnabled = true;
 
 const vessels = new Map(); // mmsi -> vessel state
 
@@ -23,6 +24,7 @@ document.addEventListener("DOMContentLoaded", init);
 function init() {
   cacheDomRefs();
   loadZoneFromStorage();
+  loadAggregationFromStorage();
   initMap();
   wireUi();
   updateZoomThresholdLabel();
@@ -51,6 +53,7 @@ function cacheDomRefs() {
   els.btnDisconnect = document.getElementById("btn-disconnect");
   els.btnRecenter = document.getElementById("btn-recenter");
   els.btnZoneToggle = document.getElementById("btn-zone-toggle");
+  els.aggregationToggle = document.getElementById("aggregation-toggle");
 
   els.loginModal = document.getElementById("login-modal");
   els.apiKeyInput = document.getElementById("api-key-input");
@@ -73,10 +76,18 @@ function cacheDomRefs() {
   els.legendTotal = document.getElementById("legend-total-count");
   els.legendUpdated = document.getElementById("legend-updated-at");
   els.legendZoomThreshold = document.getElementById("legend-zoom-threshold");
+  els.legendFootnote = document.getElementById("legend-footnote");
 }
 
 function updateZoomThresholdLabel() {
   els.legendZoomThreshold.textContent = CLUSTER_DISABLE_ZOOM;
+  updateAggregationFootnote();
+}
+
+function updateAggregationFootnote() {
+  els.legendFootnote.textContent = aggregationEnabled
+    ? `Zoom ≥ ${CLUSTER_DISABLE_ZOOM} : navires individuels · en-deçà : agrégats`
+    : "Agrégation désactivée : tous les navires sont affichés individuellement";
 }
 
 // --- Carte ---
@@ -93,15 +104,49 @@ function initMap() {
     drawZoneRectangle(currentZone);
   }
 
-  markerClusterGroup = L.markerClusterGroup({
-    disableClusteringAtZoom: CLUSTER_DISABLE_ZOOM,
-    maxClusterRadius: 60,
-    showCoverageOnHover: false,
-    spiderfyOnMaxZoom: false,
-  });
+  markerClusterGroup = createMarkerLayer();
   map.addLayer(markerClusterGroup);
 
   map.on("moveend zoomend", () => recomputeLegend());
+}
+
+// Selon le mode agrégation, les navires sont regroupés en clusters comptés
+// au-delà d'un certain zoom, ou toujours affichés individuellement.
+function createMarkerLayer() {
+  if (aggregationEnabled) {
+    return L.markerClusterGroup({
+      disableClusteringAtZoom: CLUSTER_DISABLE_ZOOM,
+      maxClusterRadius: 60,
+      showCoverageOnHover: false,
+      spiderfyOnMaxZoom: false,
+    });
+  }
+  return L.layerGroup();
+}
+
+function loadAggregationFromStorage() {
+  const stored = localStorage.getItem(STORAGE_KEY_AGGREGATION);
+  if (stored !== null) {
+    aggregationEnabled = stored !== "0";
+  }
+  els.aggregationToggle.checked = aggregationEnabled;
+}
+
+function setAggregationEnabled(enabled) {
+  aggregationEnabled = enabled;
+  localStorage.setItem(STORAGE_KEY_AGGREGATION, enabled ? "1" : "0");
+  updateAggregationFootnote();
+
+  map.removeLayer(markerClusterGroup);
+  markerClusterGroup = createMarkerLayer();
+  map.addLayer(markerClusterGroup);
+
+  for (const v of vessels.values()) {
+    v.marker = null;
+    placeVesselMarker(v);
+  }
+  legendDirty = true;
+  recomputeLegend();
 }
 
 function zoneBounds(zone) {
@@ -151,6 +196,9 @@ function wireUi() {
   });
   els.btnZoneApply.addEventListener("click", applyZoneFromInputs);
   els.btnModalConnect.addEventListener("click", handleModalConnect);
+  els.aggregationToggle.addEventListener("change", () => {
+    setAggregationEnabled(els.aggregationToggle.checked);
+  });
 
   const stored = localStorage.getItem(STORAGE_KEY_API);
   if (stored) els.apiKeyInput.value = stored;

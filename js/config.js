@@ -20,6 +20,7 @@ const STALE_CHECK_INTERVAL_MS = 60 * 1000;
 
 const STORAGE_KEY_API = "aisstream_api_key";
 const STORAGE_KEY_ZONE = "aisstream_zone";
+const STORAGE_KEY_AGGREGATION = "aisstream_aggregation";
 
 const RECONNECT_BASE_DELAY_MS = 2000;
 const RECONNECT_MAX_DELAY_MS = 30000;

@@ -96,6 +96,23 @@ html, body {
   gap: 8px;
 }
 
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #f2f6fa;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle-row input {
+  cursor: pointer;
+}
+
 button {
   cursor: pointer;
   border: none;
