@@ -7,7 +7,7 @@ const AIS_STREAM_URL = "wss://stream.aisstream.io/v0/stream";
 const DEFAULT_ZONE = {
   north: 53.5,
   south: 48.3,
-  west: -7.5,
+  west: -7,
   east: 7,
 };
 
