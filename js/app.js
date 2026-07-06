@@ -7,7 +7,7 @@ let manualDisconnect = false;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
 let currentApiKey = null;
-let currentZone = null; // défini par l'utilisateur avant toute connexion
+let currentZone = { ...DEFAULT_ZONE }; // modifiable par l'utilisateur avant connexion
 let legendDirty = true;
 
 const vessels = new Map(); // mmsi -> vessel state

@@ -2,6 +2,15 @@
 
 const AIS_STREAM_URL = "wss://stream.aisstream.io/v0/stream";
 
+// Zone pré-remplie au premier lancement ; entièrement modifiable par
+// l'utilisateur avant de se connecter (voir le formulaire de connexion).
+const DEFAULT_ZONE = {
+  north: 53.5,
+  south: 48.3,
+  west: -7.5,
+  east: 7,
+};
+
 // Zoom à partir duquel les navires sont affichés individuellement.
 // En-dessous de ce niveau, les navires sont agrégés (cluster + compteur).
 const CLUSTER_DISABLE_ZOOM = 8;
