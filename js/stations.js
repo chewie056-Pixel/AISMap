@@ -111,12 +111,19 @@ function connect(apiKey, zone) {
 
   ws.onmessage = (evt) => readAisMessage(evt, handleData);
 
-  ws.onerror = () => {
+  ws.onerror = (evt) => {
+    console.error("AIS: erreur WebSocket", evt);
     setStatus("error", "Erreur de connexion");
   };
 
-  ws.onclose = () => {
-    setStatus("error", "Connexion perdue — nouvelle tentative…");
+  ws.onclose = (evt) => {
+    console.warn("AIS: connexion fermée", {
+      code: evt.code,
+      reason: evt.reason,
+      wasClean: evt.wasClean,
+    });
+    const codeInfo = evt.code ? ` (code ${evt.code}${evt.reason ? " — " + evt.reason : ""})` : "";
+    setStatus("error", `Connexion perdue${codeInfo} — nouvelle tentative…`);
     scheduleReconnect(apiKey, zone);
   };
 }

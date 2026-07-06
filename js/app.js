@@ -456,16 +456,23 @@ function connect(apiKey) {
 
   ws.onmessage = (evt) => readAisMessage(evt, onAisData);
 
-  ws.onerror = () => {
+  ws.onerror = (evt) => {
+    console.error("AIS: erreur WebSocket", evt);
     setStatus("error", "Erreur de connexion");
   };
 
-  ws.onclose = () => {
+  ws.onclose = (evt) => {
+    console.warn("AIS: connexion fermée", {
+      code: evt.code,
+      reason: evt.reason,
+      wasClean: evt.wasClean,
+    });
     if (manualDisconnect) {
       setStatus("disconnected", "Déconnecté");
       return;
     }
-    setStatus("error", "Connexion perdue — nouvelle tentative…");
+    const codeInfo = evt.code ? ` (code ${evt.code}${evt.reason ? " — " + evt.reason : ""})` : "";
+    setStatus("error", `Connexion perdue${codeInfo} — nouvelle tentative…`);
     scheduleReconnect();
   };
 }
