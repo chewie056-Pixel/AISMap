@@ -518,10 +518,11 @@ function recomputeLegend() {
 
   els.legendList.innerHTML = "";
   for (const cat of LEGEND_ORDER) {
-    if (!counts[cat]) continue;
     const info = SHIP_CATEGORIES[cat];
+    const count = counts[cat] || 0;
     const li = document.createElement("li");
-    li.innerHTML = `<span class="legend-swatch" style="background:${info.color}"></span><span class="legend-label">${info.label}</span><span class="legend-count">${counts[cat]}</span>`;
+    if (!count) li.classList.add("legend-empty");
+    li.innerHTML = `<span class="legend-swatch" style="background:${info.color}"></span><span class="legend-label">${info.label}</span><span class="legend-count">${count}</span>`;
     els.legendList.appendChild(li);
   }
 

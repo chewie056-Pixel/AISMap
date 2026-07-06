@@ -185,6 +185,14 @@ button:hover {
   font-weight: 600;
 }
 
+.legend-empty {
+  opacity: 0.45;
+}
+
+.legend-empty .legend-count {
+  font-weight: 400;
+}
+
 .legend-footnote {
   font-size: 11px;
   color: #667;
@@ -336,6 +344,7 @@ button:hover {
 .vessel-icon-wrapper {
   background: transparent;
   border: none;
+  opacity: 1 !important;
 }
 
 .vessel-marker {
@@ -343,7 +352,9 @@ button:hover {
   height: 14px;
   background: var(--vcolor, #888);
   clip-path: polygon(50% 0%, 100% 100%, 50% 78%, 0% 100%);
-  border: 1px solid rgba(0, 0, 0, 0.45);
+  border: 1.5px solid rgba(0, 0, 0, 0.7);
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
 }
 
 .vessel-marker.no-heading {
