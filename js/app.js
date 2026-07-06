@@ -15,6 +15,9 @@ let lastStatusUpdate = 0;
 let aggregationEnabled = true;
 let showStationsOnMap = false;
 let stationsLayerGroup;
+let drawingZone = false;
+let drawStartLatLng = null;
+let drawRectangle = null;
 
 const vessels = new Map(); // mmsi -> vessel state
 const stations = new Map(); // mmsi -> station state (Base Station Report)
@@ -59,6 +62,8 @@ function cacheDomRefs() {
   els.btnZoneToggle = document.getElementById("btn-zone-toggle");
   els.aggregationToggle = document.getElementById("aggregation-toggle");
   els.stationsToggle = document.getElementById("stations-toggle");
+  els.btnDrawZone = document.getElementById("btn-draw-zone");
+  els.drawZoneHint = document.getElementById("draw-zone-hint");
 
   els.loginModal = document.getElementById("login-modal");
   els.apiKeyInput = document.getElementById("api-key-input");
@@ -228,6 +233,10 @@ function wireUi() {
   els.stationsToggle.addEventListener("change", () => {
     setShowStationsOnMap(els.stationsToggle.checked);
   });
+  els.btnDrawZone.addEventListener("click", toggleZoneDrawing);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && drawingZone) cancelZoneDrawing();
+  });
 
   const stored = localStorage.getItem(STORAGE_KEY_API);
   if (stored) els.apiKeyInput.value = stored;
@@ -300,14 +309,101 @@ function applyZoneFromInputs() {
     alert("Coordonnées invalides : vérifiez que Nord > Sud et Est > Ouest.");
     return;
   }
+  applyNewZone(zone);
+  els.zonePanel.classList.add("hidden");
+}
 
+// Définit la nouvelle zone active, la persiste, redessine le rectangle et
+// reconnecte le flux AISStream dessus si une connexion est déjà en cours.
+function applyNewZone(zone) {
   currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
   drawZoneRectangle(currentZone);
-  els.zonePanel.classList.add("hidden");
 
   if (currentApiKey) {
     reconnectWithCurrentZone();
+  }
+}
+
+// --- Dessin de la zone directement sur la carte ---
+
+const MIN_DRAWN_ZONE_SPAN_DEG = 0.05;
+
+function toggleZoneDrawing() {
+  if (drawingZone) {
+    cancelZoneDrawing();
+  } else {
+    startZoneDrawing();
+  }
+}
+
+function startZoneDrawing() {
+  drawingZone = true;
+  els.btnDrawZone.classList.add("active");
+  els.drawZoneHint.classList.remove("hidden");
+  els.zonePanel.classList.add("hidden");
+  map.dragging.disable();
+  map.getContainer().style.cursor = "crosshair";
+  map.once("mousedown", onDrawMouseDown);
+}
+
+function onDrawMouseDown(e) {
+  drawStartLatLng = e.latlng;
+  drawRectangle = L.rectangle(L.latLngBounds(e.latlng, e.latlng), {
+    color: "#27ae60",
+    weight: 2,
+    fill: true,
+    fillOpacity: 0.1,
+    dashArray: "4,4",
+  }).addTo(map);
+  map.on("mousemove", onDrawMouseMove);
+  map.once("mouseup", onDrawMouseUp);
+}
+
+function onDrawMouseMove(e) {
+  if (!drawRectangle || !drawStartLatLng) return;
+  drawRectangle.setBounds(L.latLngBounds(drawStartLatLng, e.latlng));
+}
+
+function onDrawMouseUp() {
+  map.off("mousemove", onDrawMouseMove);
+  const bounds = drawRectangle ? drawRectangle.getBounds() : null;
+  finishZoneDrawing(bounds);
+}
+
+function finishZoneDrawing(bounds) {
+  resetDrawingState();
+  if (!bounds) return;
+
+  const north = bounds.getNorth();
+  const south = bounds.getSouth();
+  const west = bounds.getWest();
+  const east = bounds.getEast();
+
+  if (north - south < MIN_DRAWN_ZONE_SPAN_DEG || east - west < MIN_DRAWN_ZONE_SPAN_DEG) {
+    return; // simple clic sans glisser : rectangle dégénéré, on ignore
+  }
+
+  applyNewZone({ north, south, west, east });
+}
+
+function cancelZoneDrawing() {
+  map.off("mousedown", onDrawMouseDown);
+  map.off("mouseup", onDrawMouseUp);
+  resetDrawingState();
+}
+
+function resetDrawingState() {
+  drawingZone = false;
+  drawStartLatLng = null;
+  els.btnDrawZone.classList.remove("active");
+  els.drawZoneHint.classList.add("hidden");
+  map.off("mousemove", onDrawMouseMove);
+  map.dragging.enable();
+  map.getContainer().style.cursor = "";
+  if (drawRectangle) {
+    map.removeLayer(drawRectangle);
+    drawRectangle = null;
   }
 }
 

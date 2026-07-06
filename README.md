@@ -15,7 +15,11 @@ définie par l'utilisateur.
   l'application demande une zone (boîte englobante Nord/Sud/Ouest/Est) en
   plus de la clé API. Aucune zone n'est présélectionnée : c'est cette zone
   qui détermine la souscription AISStream et les navires affichés. Elle est
-  modifiable à tout moment via le bouton **⚙︎ Zone**.
+  modifiable à tout moment soit par valeurs numériques (bouton **⚙︎ Zone**),
+  soit en la **dessinant directement sur la carte** (bouton **✏️ Dessiner
+  zone** : cliquez-glissez pour tracer le nouveau rectangle, Échap pour
+  annuler). Dans les deux cas, si une connexion est active elle est
+  automatiquement relancée avec la nouvelle zone.
 - **Carte mondiale** avec la zone surveillée encadrée par un rectangle.
 - **Affichage adaptatif selon le zoom** :
   - zoom ≥ 8 : chaque navire est affiché individuellement (triangle orienté

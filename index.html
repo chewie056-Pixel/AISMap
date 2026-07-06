@@ -14,6 +14,10 @@
 
 <div id="map"></div>
 
+<div id="draw-zone-hint" class="hint-banner hidden">
+  Cliquez-glissez sur la carte pour dessiner la nouvelle zone · Échap pour annuler
+</div>
+
 <header id="topbar">
   <div class="brand">
     <span class="brand-dot"></span>
@@ -37,7 +41,8 @@
     <button id="btn-connect">Se connecter</button>
     <button id="btn-disconnect" class="hidden">Se déconnecter</button>
     <button id="btn-recenter" title="Recentrer sur la zone">🔍 Zone</button>
-    <button id="btn-zone-toggle" title="Modifier la zone">⚙︎ Zone</button>
+    <button id="btn-zone-toggle" title="Modifier la zone (valeurs numériques)">⚙︎ Zone</button>
+    <button id="btn-draw-zone" title="Dessiner une nouvelle zone sur la carte">✏️ Dessiner zone</button>
     <a id="btn-stations-link" class="nav-link" href="stations.html" title="Voir les stations AIS émettant dans la zone">📡 Stations</a>
   </div>
 </header>

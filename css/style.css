@@ -154,11 +154,34 @@ button:hover {
   background: #c0392b;
 }
 
-#btn-recenter, #btn-zone-toggle {
+#btn-recenter, #btn-zone-toggle, #btn-draw-zone {
   background: rgba(255, 255, 255, 0.12);
 }
-#btn-recenter:hover, #btn-zone-toggle:hover {
+#btn-recenter:hover, #btn-zone-toggle:hover, #btn-draw-zone:hover {
   background: rgba(255, 255, 255, 0.22);
+}
+
+#btn-draw-zone.active {
+  background: #27ae60;
+}
+#btn-draw-zone.active:hover {
+  background: #219150;
+}
+
+.hint-banner {
+  position: absolute;
+  top: 58px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 950;
+  background: rgba(15, 26, 41, 0.92);
+  color: #f2f6fa;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
 }
 
 .nav-link {
