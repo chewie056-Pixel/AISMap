@@ -168,7 +168,7 @@ function renderStations() {
       (s) => `
         <tr>
           <td>${s.mmsi}</td>
-          <td>${s.name || "—"}</td>
+          <td>${s.name ? escapeHtml(s.name) : "—"}</td>
           <td>${s.lat.toFixed(4)}</td>
           <td>${s.lon.toFixed(4)}</td>
           <td>${epfdLabel(s.epfd)}</td>

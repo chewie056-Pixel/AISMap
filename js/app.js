@@ -15,12 +15,18 @@ let lastStatusUpdate = 0;
 let aggregationEnabled = true;
 let showStationsOnMap = false;
 let stationsLayerGroup;
+let showAidsOnMap = false;
+let aidsLayerGroup;
 let drawingZone = false;
 let drawStartLatLng = null;
 let drawRectangle = null;
 
+const MAX_SAFETY_MESSAGES = 20;
+
 const vessels = new Map(); // mmsi -> vessel state
 const stations = new Map(); // mmsi -> station state (Base Station Report)
+const aidsToNav = new Map(); // mmsi -> aide à la navigation (AtoN, type 21)
+const safetyMessages = []; // messages de sécurité (type 14), le plus récent en premier
 
 // Cette page détient la seule connexion WebSocket réelle. Elle diffuse les
 // données/statut aux autres pages (Stations) via ce canal, pour éviter que
@@ -47,6 +53,7 @@ function init() {
   loadZoneFromStorage();
   loadAggregationFromStorage();
   loadShowStationsFromStorage();
+  loadShowAidsFromStorage();
   initMap();
   wireUi();
   updateZoomThresholdLabel();
@@ -73,10 +80,12 @@ function cacheDomRefs() {
   els.statusText = document.getElementById("status-text");
   els.btnConnect = document.getElementById("btn-connect");
   els.btnDisconnect = document.getElementById("btn-disconnect");
+  els.btnMapMenu = document.getElementById("btn-map-menu");
+  els.mapMenu = document.getElementById("map-menu");
   els.btnRecenter = document.getElementById("btn-recenter");
-  els.btnZoneToggle = document.getElementById("btn-zone-toggle");
   els.aggregationToggle = document.getElementById("aggregation-toggle");
   els.stationsToggle = document.getElementById("stations-toggle");
+  els.aidsToggle = document.getElementById("aids-toggle");
   els.btnDrawZone = document.getElementById("btn-draw-zone");
   els.drawZoneHint = document.getElementById("draw-zone-hint");
 
@@ -90,7 +99,6 @@ function cacheDomRefs() {
   els.setupZoneWest = document.getElementById("setup-zone-west");
   els.setupZoneEast = document.getElementById("setup-zone-east");
 
-  els.zonePanel = document.getElementById("zone-panel");
   els.zoneNorth = document.getElementById("zone-north");
   els.zoneSouth = document.getElementById("zone-south");
   els.zoneWest = document.getElementById("zone-west");
@@ -99,9 +107,16 @@ function cacheDomRefs() {
 
   els.legendList = document.getElementById("legend-list");
   els.legendTotal = document.getElementById("legend-total-count");
+  els.legendStationsCount = document.getElementById("legend-stations-count");
+  els.legendAidsCount = document.getElementById("legend-aids-count");
   els.legendUpdated = document.getElementById("legend-updated-at");
   els.legendZoomThreshold = document.getElementById("legend-zoom-threshold");
   els.legendFootnote = document.getElementById("legend-footnote");
+
+  els.safetyPanel = document.getElementById("safety-panel");
+  els.safetyList = document.getElementById("safety-list");
+  els.safetyCount = document.getElementById("safety-count");
+  els.btnSafetyClear = document.getElementById("btn-safety-clear");
 }
 
 function updateZoomThresholdLabel() {
@@ -137,6 +152,11 @@ function initMap() {
     map.addLayer(stationsLayerGroup);
   }
 
+  aidsLayerGroup = L.layerGroup();
+  if (showAidsOnMap) {
+    map.addLayer(aidsLayerGroup);
+  }
+
   map.on("moveend zoomend", () => recomputeLegend());
 }
 
@@ -154,6 +174,24 @@ function setShowStationsOnMap(enabled) {
   } else {
     map.removeLayer(stationsLayerGroup);
   }
+  legendDirty = true;
+}
+
+function loadShowAidsFromStorage() {
+  const stored = localStorage.getItem(STORAGE_KEY_SHOW_AIDS);
+  showAidsOnMap = stored === "1";
+  els.aidsToggle.checked = showAidsOnMap;
+}
+
+function setShowAidsOnMap(enabled) {
+  showAidsOnMap = enabled;
+  localStorage.setItem(STORAGE_KEY_SHOW_AIDS, enabled ? "1" : "0");
+  if (enabled) {
+    map.addLayer(aidsLayerGroup);
+  } else {
+    map.removeLayer(aidsLayerGroup);
+  }
+  legendDirty = true;
 }
 
 // Selon le mode agrégation, les navires sont regroupés en clusters comptés
@@ -232,13 +270,22 @@ function parseZoneInputs(elNorth, elSouth, elWest, elEast) {
 function wireUi() {
   els.btnConnect.addEventListener("click", showLoginModal);
   els.btnDisconnect.addEventListener("click", disconnect);
-  els.btnRecenter.addEventListener("click", () => {
-    if (!zoneRectangle) return;
-    map.fitBounds(zoneRectangle.getBounds(), { padding: [40, 40] });
+
+  els.btnMapMenu.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const opening = els.mapMenu.classList.contains("hidden");
+    if (opening) populateZoneInputs();
+    els.mapMenu.classList.toggle("hidden");
   });
-  els.btnZoneToggle.addEventListener("click", () => {
-    populateZoneInputs();
-    els.zonePanel.classList.toggle("hidden");
+  document.addEventListener("click", (e) => {
+    if (!els.mapMenu.classList.contains("hidden") && !e.target.closest(".dropdown")) {
+      els.mapMenu.classList.add("hidden");
+    }
+  });
+
+  els.btnRecenter.addEventListener("click", () => {
+    if (zoneRectangle) map.fitBounds(zoneRectangle.getBounds(), { padding: [40, 40] });
+    els.mapMenu.classList.add("hidden");
   });
   els.btnZoneApply.addEventListener("click", applyZoneFromInputs);
   els.btnModalConnect.addEventListener("click", handleModalConnect);
@@ -248,7 +295,11 @@ function wireUi() {
   els.stationsToggle.addEventListener("change", () => {
     setShowStationsOnMap(els.stationsToggle.checked);
   });
+  els.aidsToggle.addEventListener("change", () => {
+    setShowAidsOnMap(els.aidsToggle.checked);
+  });
   els.btnDrawZone.addEventListener("click", toggleZoneDrawing);
+  els.btnSafetyClear.addEventListener("click", clearSafetyMessages);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && drawingZone) cancelZoneDrawing();
   });
@@ -326,7 +377,7 @@ function applyZoneFromInputs() {
     return;
   }
   applyNewZone(zone);
-  els.zonePanel.classList.add("hidden");
+  els.mapMenu.classList.add("hidden");
 }
 
 // Définit la nouvelle zone active, la persiste, redessine le rectangle et
@@ -358,7 +409,7 @@ function startZoneDrawing() {
   drawingZone = true;
   els.btnDrawZone.classList.add("active");
   els.drawZoneHint.classList.remove("hidden");
-  els.zonePanel.classList.add("hidden");
+  els.mapMenu.classList.add("hidden");
   map.dragging.disable();
   map.getContainer().style.cursor = "crosshair";
   map.once("mousedown", onDrawMouseDown);
@@ -462,9 +513,12 @@ function connect(apiKey) {
         FilterMessageTypes: [
           "PositionReport",
           "StandardClassBPositionReport",
+          "ExtendedClassBPositionReport",
           "ShipStaticData",
           "StaticDataReport",
           "BaseStationReport",
+          "AidsToNavigationReport",
+          "SafetyBroadcastMessage",
         ],
       })
     );
@@ -573,10 +627,21 @@ function handleMessage(data) {
     upsertStation(data);
     return;
   }
+  if (data.Message?.AidsToNavigationReport) {
+    upsertAidToNav(data);
+    return;
+  }
+  if (data.Message?.SafetyBroadcastMessage) {
+    addSafetyMessage(data);
+    return;
+  }
 
   const meta = data.MetaData || {};
+  const extendedClassB = data.Message?.ExtendedClassBPositionReport;
   const posReport =
-    data.Message?.PositionReport || data.Message?.StandardClassBPositionReport;
+    data.Message?.PositionReport ||
+    data.Message?.StandardClassBPositionReport ||
+    extendedClassB;
   const staticDataReport = data.Message?.StaticDataReport;
   const mmsi =
     meta.MMSI ??
@@ -590,7 +655,9 @@ function handleMessage(data) {
     return;
   }
 
-  if (posReport) {
+  if (extendedClassB) {
+    upsertExtendedClassB(mmsi, meta, extendedClassB);
+  } else if (posReport) {
     upsertPosition(mmsi, meta, posReport);
   } else if (type === "ShipStaticData" && data.Message?.ShipStaticData) {
     upsertStatic(mmsi, meta, data.Message.ShipStaticData);
@@ -599,6 +666,22 @@ function handleMessage(data) {
   } else {
     console.debug("AIS: type de message non traité", type);
   }
+}
+
+// AIS type 19 : comme un StandardClassBPositionReport (position), mais avec
+// en plus le nom/type du navire inclus directement dans le même message (pas
+// besoin d'un StaticDataReport séparé pour ces champs).
+function upsertExtendedClassB(mmsi, meta, report) {
+  upsertPosition(mmsi, meta, report);
+  const v = vessels.get(mmsi);
+  if (!v) return;
+
+  const name = (report.Name || meta.ShipName || "").trim();
+  if (name) v.name = name;
+  if (report.ShipType !== undefined) v.category = categorizeShipType(report.ShipType);
+
+  if (v.marker) v.marker.setIcon(vesselIcon(v));
+  legendDirty = true;
 }
 
 function upsertStation(data) {
@@ -642,13 +725,100 @@ function stationPopupContent(s) {
     : "—";
   return `
     <div class="vessel-popup">
-      <strong>${s.name || "Station de base"}</strong><br/>
+      <strong>${s.name ? escapeHtml(s.name) : "Station de base"}</strong><br/>
       MMSI : ${s.mmsi}<br/>
       Positionnement (EPFD) : ${epfdLabel(s.epfd)}<br/>
       RAIM : ${s.raim === undefined ? "—" : s.raim ? "Oui" : "Non"}<br/>
       Heure station : ${stationTime}<br/>
       Dernière réception : ${updated}
     </div>`;
+}
+
+// AIS type 21 : aides à la navigation (bouées, phares, balises, AtoN virtuels).
+function upsertAidToNav(data) {
+  const parsed = parseAidsToNavigationReport(data);
+  if (!parsed) {
+    console.warn("AIS: aide à la navigation sans position exploitable, ignorée", data);
+    return;
+  }
+
+  let a = aidsToNav.get(parsed.mmsi);
+  if (!a) {
+    a = { ...parsed, lastSeen: Date.now(), marker: null };
+    aidsToNav.set(parsed.mmsi, a);
+  } else {
+    Object.assign(a, parsed, { lastSeen: Date.now() });
+  }
+
+  if (!a.marker) {
+    a.marker = L.marker([a.lat, a.lon], { icon: aidIcon() });
+    a.marker.bindPopup("", { closeButton: true });
+    a.marker.on("popupopen", () => a.marker.setPopupContent(aidPopupContent(a)));
+    aidsLayerGroup.addLayer(a.marker);
+  } else {
+    a.marker.setLatLng([a.lat, a.lon]);
+  }
+  legendDirty = true;
+}
+
+function aidIcon() {
+  return L.divIcon({
+    className: "aid-icon-wrapper",
+    html: '<div class="aid-marker">⚓</div>',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+  });
+}
+
+function aidPopupContent(a) {
+  const updated = new Date(a.lastSeen).toLocaleTimeString("fr-FR");
+  return `
+    <div class="vessel-popup">
+      <strong>${a.name ? escapeHtml(a.name) : "Aide à la navigation"}</strong><br/>
+      MMSI : ${a.mmsi}<br/>
+      Type : ${aidTypeLabel(a.type)}<br/>
+      ${a.virtual ? "AtoN virtuel<br/>" : ""}
+      ${a.offPosition ? "⚠ Hors position<br/>" : ""}
+      Dernière réception : ${updated}
+    </div>`;
+}
+
+// --- Messages de sécurité (AIS type 14) ---
+
+function addSafetyMessage(data) {
+  const meta = data.MetaData || {};
+  const report = data.Message.SafetyBroadcastMessage;
+  const text = (report.Text ?? report.SafetyText ?? "").trim();
+  if (!text) return;
+
+  safetyMessages.unshift({
+    mmsi: meta.MMSI ?? meta.Mmsi ?? report.UserID,
+    name: meta.ShipName,
+    text,
+    time: Date.now(),
+  });
+  safetyMessages.length = Math.min(safetyMessages.length, MAX_SAFETY_MESSAGES);
+  renderSafetyMessages();
+}
+
+function renderSafetyMessages() {
+  if (safetyMessages.length === 0) {
+    els.safetyPanel.classList.add("hidden");
+    return;
+  }
+  els.safetyPanel.classList.remove("hidden");
+  els.safetyCount.textContent = `(${safetyMessages.length})`;
+  els.safetyList.innerHTML = safetyMessages
+    .map((m) => {
+      const who = m.name || (m.mmsi ? `MMSI ${m.mmsi}` : "Émetteur inconnu");
+      return `<li>${escapeHtml(m.text)}<br/><span class="safety-meta">${escapeHtml(who)} · ${new Date(m.time).toLocaleTimeString("fr-FR")}</span></li>`;
+    })
+    .join("");
+}
+
+function clearSafetyMessages() {
+  safetyMessages.length = 0;
+  renderSafetyMessages();
 }
 
 function getOrCreateVessel(mmsi) {
@@ -749,7 +919,7 @@ function popupContent(v) {
   const updated = v.lastUpdate ? new Date(v.lastUpdate).toLocaleTimeString("fr-FR") : "—";
   return `
     <div class="vessel-popup">
-      <strong>${v.name || "Nom inconnu"}</strong><br/>
+      <strong>${v.name ? escapeHtml(v.name) : "Nom inconnu"}</strong><br/>
       MMSI : ${v.mmsi}<br/>
       Type : ${cat.label}<br/>
       Vitesse : ${v.sog !== undefined ? v.sog.toFixed(1) + " nds" : "—"}<br/>
@@ -778,6 +948,9 @@ function clearAllVessels() {
 
   stationsLayerGroup.clearLayers();
   stations.clear();
+
+  aidsLayerGroup.clearLayers();
+  aidsToNav.clear();
 }
 
 // --- Légende ---
@@ -819,5 +992,18 @@ function recomputeLegend() {
   }
 
   els.legendTotal.textContent = total;
+
+  els.legendStationsCount.textContent = showStationsOnMap ? countInBounds(stations, bounds) : 0;
+  els.legendAidsCount.textContent = showAidsOnMap ? countInBounds(aidsToNav, bounds) : 0;
+
   els.legendUpdated.textContent = new Date().toLocaleTimeString("fr-FR");
+}
+
+function countInBounds(items, bounds) {
+  let count = 0;
+  for (const item of items.values()) {
+    if (item.lat === undefined || item.lon === undefined) continue;
+    if (bounds.contains([item.lat, item.lon])) count++;
+  }
+  return count;
 }

@@ -30,19 +30,41 @@
   </div>
 
   <div id="conn-controls">
-    <label class="toggle-row" title="Regrouper les navires proches en un seul indicateur numérique selon le zoom">
-      <input type="checkbox" id="aggregation-toggle" checked />
-      Agrégation
-    </label>
-    <label class="toggle-row" title="Afficher les stations AIS de base (Base Station Report) sur la carte">
-      <input type="checkbox" id="stations-toggle" />
-      📡 Stations sur la carte
-    </label>
+    <div class="dropdown">
+      <button id="btn-map-menu" class="nav-link" title="Options d'affichage et zone de la carte">🗺️ Carte ▾</button>
+      <div id="map-menu" class="dropdown-panel hidden">
+        <label class="toggle-row-menu" title="Regrouper les navires proches en un seul indicateur numérique selon le zoom">
+          <input type="checkbox" id="aggregation-toggle" checked />
+          Agrégation des navires
+        </label>
+        <label class="toggle-row-menu" title="Afficher les stations AIS de base (Base Station Report) sur la carte">
+          <input type="checkbox" id="stations-toggle" />
+          📡 Stations de base
+        </label>
+        <label class="toggle-row-menu" title="Afficher les aides à la navigation (bouées, phares, balises AIS) sur la carte">
+          <input type="checkbox" id="aids-toggle" />
+          ⚓ Aides à la navigation
+        </label>
+
+        <div class="dropdown-divider"></div>
+
+        <button id="btn-recenter" class="dropdown-item">🔍 Recentrer sur la zone</button>
+        <button id="btn-draw-zone" class="dropdown-item">✏️ Dessiner une nouvelle zone</button>
+
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-subheading">Zone (valeurs numériques)</div>
+        <div class="zone-grid">
+          <label>Nord <input type="number" id="zone-north" step="0.1"></label>
+          <label>Sud <input type="number" id="zone-south" step="0.1"></label>
+          <label>Ouest <input type="number" id="zone-west" step="0.1"></label>
+          <label>Est <input type="number" id="zone-east" step="0.1"></label>
+        </div>
+        <button id="btn-zone-apply">Appliquer et reconnecter</button>
+      </div>
+    </div>
+
     <button id="btn-connect">Se connecter</button>
     <button id="btn-disconnect" class="hidden">Se déconnecter</button>
-    <button id="btn-recenter" title="Recentrer sur la zone">🔍 Zone</button>
-    <button id="btn-zone-toggle" title="Modifier la zone (valeurs numériques)">⚙︎ Zone</button>
-    <button id="btn-draw-zone" title="Dessiner une nouvelle zone sur la carte">✏️ Dessiner zone</button>
     <a id="btn-stations-link" class="nav-link" href="stations.html" title="Voir les stations AIS émettant dans la zone">📡 Stations</a>
   </div>
 </header>
@@ -77,27 +99,26 @@
   </div>
 </div>
 
-<div id="zone-panel" class="panel hidden">
-  <h3>Zone surveillée</h3>
-  <div class="zone-grid">
-    <label>Nord <input type="number" id="zone-north" step="0.1"></label>
-    <label>Sud <input type="number" id="zone-south" step="0.1"></label>
-    <label>Ouest <input type="number" id="zone-west" step="0.1"></label>
-    <label>Est <input type="number" id="zone-east" step="0.1"></label>
-  </div>
-  <button id="btn-zone-apply">Appliquer et reconnecter</button>
-</div>
-
 <div id="legend" class="panel">
   <h3>Flotte visible</h3>
   <div class="legend-total">
     <span id="legend-total-count">0</span> navire(s) dans la vue
   </div>
   <ul id="legend-list"></ul>
+  <div class="legend-extra-counts">
+    <div>📡 <span id="legend-stations-count">0</span> station(s) visible(s)</div>
+    <div>⚓ <span id="legend-aids-count">0</span> aide(s) à la navigation visible(s)</div>
+  </div>
   <div class="legend-footnote" id="legend-footnote">
     Zoom ≥ <span id="legend-zoom-threshold"></span> : navires individuels · en-deçà : agrégats
   </div>
   <div class="legend-updated">Mis à jour : <span id="legend-updated-at">—</span></div>
+</div>
+
+<div id="safety-panel" class="panel hidden">
+  <h3>⚠ Messages de sécurité <span id="safety-count"></span></h3>
+  <ul id="safety-list"></ul>
+  <button id="btn-safety-clear">Effacer</button>
 </div>
 
 <script src="vendor/leaflet/leaflet.js"></script>

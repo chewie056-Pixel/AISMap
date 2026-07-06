@@ -1,5 +1,14 @@
 // Utilitaires partagés pour la lecture des messages WebSocket AISStream.io
 
+// Les noms de navires/stations et les messages de sécurité proviennent de
+// diffusions AIS externes (non fiables) et sont injectés dans le HTML des
+// popups/listes : toujours échapper avant insertion pour éviter une injection.
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
 // AISStream envoie parfois les frames en binaire : evt.data peut être une
 // chaîne, un Blob ou un ArrayBuffer selon le navigateur/serveur. Décode dans
 // tous les cas puis appelle onMessage(data) avec l'objet JSON parsé.
@@ -72,6 +81,66 @@ function parseBaseStationReport(data) {
   }
 
   return { mmsi, lat, lon, epfd, raim, stationUtc, name };
+}
+
+// Type d'aide à la navigation (AtoN), norme AIS (message type 21).
+const AID_TYPE_LABELS = {
+  0: "Non spécifié",
+  1: "Point de référence",
+  2: "RACON",
+  3: "Structure fixe au large",
+  4: "Réservé",
+  5: "Feu, sans secteurs",
+  6: "Feu, avec secteurs",
+  7: "Feu directionnel (avant)",
+  8: "Feu directionnel (arrière)",
+  9: "Balise cardinale N",
+  10: "Balise cardinale E",
+  11: "Balise cardinale S",
+  12: "Balise cardinale W",
+  13: "Balise bâbord",
+  14: "Balise tribord",
+  15: "Balise chenal préféré bâbord",
+  16: "Balise chenal préféré tribord",
+  17: "Balise danger isolé",
+  18: "Balise eaux saines",
+  19: "Balise marque spéciale",
+  20: "Marque cardinale N",
+  21: "Marque cardinale E",
+  22: "Marque cardinale S",
+  23: "Marque cardinale W",
+  24: "Marque bâbord",
+  25: "Marque tribord",
+  26: "Marque chenal préféré bâbord",
+  27: "Marque chenal préféré tribord",
+  28: "Danger isolé",
+  29: "Eaux saines",
+  30: "Marque spéciale",
+  31: "Bateau-feu / plateforme",
+};
+
+function aidTypeLabel(code) {
+  return AID_TYPE_LABELS[code] ?? "Inconnu";
+}
+
+// Extrait les champs propres à un message AIS type 21 (aide à la
+// navigation), avec repli sur plusieurs casses possibles selon la source.
+function parseAidsToNavigationReport(data) {
+  const meta = data.MetaData || {};
+  const report = data.Message?.AidsToNavigationReport;
+  if (!report) return null;
+
+  const mmsi = meta.MMSI ?? meta.Mmsi ?? report.UserID;
+  const lat = meta.latitude ?? meta.Latitude ?? report.Latitude ?? report.latitude;
+  const lon = meta.longitude ?? meta.Longitude ?? report.Longitude ?? report.longitude;
+  if (!mmsi || lat === undefined || lon === undefined) return null;
+
+  const name = (report.Name ?? meta.ShipName ?? "").trim() || null;
+  const type = report.Type ?? report.AtoNType;
+  const virtual = report.VirtualAtoN ?? report.VirtualAton ?? false;
+  const offPosition = report.OffPosition ?? false;
+
+  return { mmsi, lat, lon, name, type, virtual, offPosition };
 }
 
 // Distance orthodromique (km) entre deux points — sert uniquement à estimer

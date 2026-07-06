@@ -15,25 +15,27 @@ définie par l'utilisateur.
   l'application demande une zone (boîte englobante Nord/Sud/Ouest/Est) en
   plus de la clé API. Aucune zone n'est présélectionnée : c'est cette zone
   qui détermine la souscription AISStream et les navires affichés. Elle est
-  modifiable à tout moment soit par valeurs numériques (bouton **⚙︎ Zone**),
-  soit en la **dessinant directement sur la carte** (bouton **✏️ Dessiner
-  zone** : cliquez-glissez pour tracer le nouveau rectangle, Échap pour
-  annuler). Dans les deux cas, si une connexion est active elle est
-  automatiquement relancée avec la nouvelle zone.
+  modifiable à tout moment depuis le menu **🗺️ Carte** du bandeau, soit par
+  valeurs numériques, soit en la **dessinant directement sur la carte**
+  (cliquez-glissez pour tracer le nouveau rectangle, Échap pour annuler). Si
+  une connexion est active, elle est automatiquement relancée avec la
+  nouvelle zone.
 - **Carte mondiale** avec la zone surveillée encadrée par un rectangle.
+- **Menu 🗺️ Carte** (bandeau) : regroupe toutes les options d'affichage —
+  agrégation des navires, affichage des stations de base et des aides à la
+  navigation sur la carte, recentrage sur la zone, dessin d'une nouvelle
+  zone, et édition numérique de la zone.
 - **Affichage adaptatif selon le zoom** :
   - zoom ≥ 8 : chaque navire est affiché individuellement (triangle orienté
     selon son cap/heading, coloré selon son type).
   - zoom < 8 : les navires sont agrégés en clusters affichant uniquement le
-    nombre de navires regroupés.
+    nombre de navires regroupés. Activable/désactivable depuis le menu Carte.
 - **Légende dynamique** (bas gauche) : répartition de la flotte visible par
-  catégorie (Cargo, Pétrolier, Passagers, Pêche, Plaisance, etc.) et nombre
-  total de navires actuellement dans la vue.
+  catégorie (Cargo, Pétrolier, Passagers, Pêche, Plaisance, etc.), nombre
+  total de navires actuellement dans la vue, ainsi que le nombre de stations
+  de base et d'aides à la navigation visibles (si affichées sur la carte).
 - Reconnexion automatique avec backoff exponentiel en cas de coupure, et
   purge des navires n'ayant pas émis depuis 15 minutes.
-- **Agrégation activable/désactivable** : un interrupteur dans le bandeau
-  permet de forcer l'affichage individuel de tous les navires, quel que soit
-  le zoom.
 - **Page « Stations »** (`stations.html`, lien 📡 dans le bandeau) : liste les
   stations AIS de base (balises côtières/terrestres, messages *Base Station
   Report*) qui émettent dans la zone configurée sur la page principale, avec
@@ -47,14 +49,18 @@ définie par l'utilisateur.
   reçues par la page principale (ouverte et connectée dans un autre onglet),
   relayées via `BroadcastChannel` — voir la note ci-dessous sur les
   connexions multiples.
-- **Stations sur la carte principale** : un interrupteur dans le bandeau
-  permet d'afficher les stations de base directement sur la carte (icône 📡
-  distincte des navires), avec le détail au clic.
-- **Reconnaissance des navires Classe B** : en plus du message type 5
+- **Aides à la navigation (AtoN)** : bouées, phares et balises AIS (message
+  type 21) affichables sur la carte depuis le menu Carte (icône ⚓), avec nom,
+  type et statut « hors position » au clic.
+- **Messages de sécurité** (message type 14, *Safety Broadcast*) : un panneau
+  apparaît automatiquement en haut à droite dès qu'un message de sécurité est
+  reçu dans la zone (avis de navigation, exercices, etc.), avec bouton pour
+  l'effacer.
+- **Reconnaissance étendue des navires** : en plus du message type 5
   (`ShipStaticData`, navires Classe A), l'application comprend le message
-  type 24 (`StaticDataReport`, en deux parties nom/type) utilisé par les
-  navires Classe B (plaisance, pêche, petites unités), pour leur attribuer
-  un nom et une catégorie dans la légende.
+  type 24 (`StaticDataReport`, en deux parties nom/type, navires Classe B) et
+  le message type 19 (`ExtendedClassBPositionReport`, position + nom/type en
+  un seul message), pour attribuer nom et catégorie à un maximum de navires.
 
 ## Lancer l'application
 
@@ -105,8 +111,9 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
     "APIKey": "VOTRE_CLE",
     "BoundingBoxes": [[[SUD, OUEST], [NORD, EST]]],
     "FilterMessageTypes": [
-      "PositionReport", "StandardClassBPositionReport",
-      "ShipStaticData", "StaticDataReport", "BaseStationReport"
+      "PositionReport", "StandardClassBPositionReport", "ExtendedClassBPositionReport",
+      "ShipStaticData", "StaticDataReport", "BaseStationReport",
+      "AidsToNavigationReport", "SafetyBroadcastMessage"
     ]
   }
   ```
@@ -121,11 +128,20 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
   après quelques secondes.
 - `PositionReport` / `StandardClassBPositionReport` fournissent la position,
   la vitesse (SOG), le cap (COG) et le cap vrai (heading).
+- `ExtendedClassBPositionReport` (type 19) fournit position et nom/type en un
+  seul message (navires Classe B qui n'émettent pas de `StaticDataReport`
+  séparé).
 - `ShipStaticData` (type 5, navires Classe A) et `StaticDataReport` (type 24,
   navires Classe B, en deux parties) fournissent le nom et le type de navire
   (code AIS 0–99), utilisés pour la catégorisation et la légende.
 - `BaseStationReport` (message AIS type 4) fournit la position des stations
   de base émettant dans la zone.
+- `AidsToNavigationReport` (type 21) fournit la position, le nom et le type
+  des bouées/phares/balises AIS de la zone.
+- `SafetyBroadcastMessage` (type 14) fournit le texte des messages de
+  sécurité diffusés dans la zone. Provenant d'une diffusion externe non
+  fiable, ce texte (ainsi que les noms de navires/stations) est systématiquement
+  échappé avant affichage (voir `escapeHtml` dans `js/ws-utils.js`).
 - La clé API n'est jamais envoyée à un serveur tiers : elle est utilisée
   uniquement pour la connexion WebSocket directe entre votre navigateur et
   AISStream.io.
