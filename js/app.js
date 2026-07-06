@@ -13,8 +13,11 @@ let messageCount = 0;
 let visibleVesselCount = 0;
 let lastStatusUpdate = 0;
 let aggregationEnabled = true;
+let showStationsOnMap = false;
+let stationsLayerGroup;
 
 const vessels = new Map(); // mmsi -> vessel state
+const stations = new Map(); // mmsi -> station state (Base Station Report)
 
 // --- DOM references ---
 const els = {};
@@ -25,6 +28,7 @@ function init() {
   cacheDomRefs();
   loadZoneFromStorage();
   loadAggregationFromStorage();
+  loadShowStationsFromStorage();
   initMap();
   wireUi();
   updateZoomThresholdLabel();
@@ -54,6 +58,7 @@ function cacheDomRefs() {
   els.btnRecenter = document.getElementById("btn-recenter");
   els.btnZoneToggle = document.getElementById("btn-zone-toggle");
   els.aggregationToggle = document.getElementById("aggregation-toggle");
+  els.stationsToggle = document.getElementById("stations-toggle");
 
   els.loginModal = document.getElementById("login-modal");
   els.apiKeyInput = document.getElementById("api-key-input");
@@ -107,7 +112,28 @@ function initMap() {
   markerClusterGroup = createMarkerLayer();
   map.addLayer(markerClusterGroup);
 
+  stationsLayerGroup = L.layerGroup();
+  if (showStationsOnMap) {
+    map.addLayer(stationsLayerGroup);
+  }
+
   map.on("moveend zoomend", () => recomputeLegend());
+}
+
+function loadShowStationsFromStorage() {
+  const stored = localStorage.getItem(STORAGE_KEY_SHOW_STATIONS);
+  showStationsOnMap = stored === "1";
+  els.stationsToggle.checked = showStationsOnMap;
+}
+
+function setShowStationsOnMap(enabled) {
+  showStationsOnMap = enabled;
+  localStorage.setItem(STORAGE_KEY_SHOW_STATIONS, enabled ? "1" : "0");
+  if (enabled) {
+    map.addLayer(stationsLayerGroup);
+  } else {
+    map.removeLayer(stationsLayerGroup);
+  }
 }
 
 // Selon le mode agrégation, les navires sont regroupés en clusters comptés
@@ -198,6 +224,9 @@ function wireUi() {
   els.btnModalConnect.addEventListener("click", handleModalConnect);
   els.aggregationToggle.addEventListener("change", () => {
     setAggregationEnabled(els.aggregationToggle.checked);
+  });
+  els.stationsToggle.addEventListener("change", () => {
+    setShowStationsOnMap(els.stationsToggle.checked);
   });
 
   const stored = localStorage.getItem(STORAGE_KEY_API);
@@ -317,7 +346,12 @@ function connect(apiKey) {
       JSON.stringify({
         APIKey: apiKey,
         BoundingBoxes: [zoneBounds(currentZone)],
-        FilterMessageTypes: ["PositionReport", "StandardClassBPositionReport", "ShipStaticData"],
+        FilterMessageTypes: [
+          "PositionReport",
+          "StandardClassBPositionReport",
+          "ShipStaticData",
+          "BaseStationReport",
+        ],
       })
     );
     setStatus("connected", "Connecté — en attente de données…");
@@ -408,6 +442,12 @@ function handleMessage(data) {
   }
 
   const type = data.MessageType;
+
+  if (data.Message?.BaseStationReport) {
+    upsertStation(data);
+    return;
+  }
+
   const meta = data.MetaData || {};
   const posReport =
     data.Message?.PositionReport || data.Message?.StandardClassBPositionReport;
@@ -426,6 +466,56 @@ function handleMessage(data) {
   } else {
     console.debug("AIS: type de message non traité", type);
   }
+}
+
+function upsertStation(data) {
+  const parsed = parseBaseStationReport(data);
+  if (!parsed) {
+    console.warn("AIS: station de base sans position exploitable, ignorée", data);
+    return;
+  }
+
+  let s = stations.get(parsed.mmsi);
+  if (!s) {
+    s = { ...parsed, lastSeen: Date.now(), marker: null };
+    stations.set(parsed.mmsi, s);
+  } else {
+    Object.assign(s, parsed, { lastSeen: Date.now() });
+  }
+
+  if (!s.marker) {
+    s.marker = L.marker([s.lat, s.lon], { icon: stationIcon() });
+    s.marker.bindPopup("", { closeButton: true });
+    s.marker.on("popupopen", () => s.marker.setPopupContent(stationPopupContent(s)));
+    stationsLayerGroup.addLayer(s.marker);
+  } else {
+    s.marker.setLatLng([s.lat, s.lon]);
+  }
+}
+
+function stationIcon() {
+  return L.divIcon({
+    className: "station-icon-wrapper",
+    html: '<div class="station-marker">📡</div>',
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
+
+function stationPopupContent(s) {
+  const updated = new Date(s.lastSeen).toLocaleTimeString("fr-FR");
+  const stationTime = s.stationUtc
+    ? s.stationUtc.toLocaleTimeString("fr-FR", { timeZone: "UTC" }) + " UTC"
+    : "—";
+  return `
+    <div class="vessel-popup">
+      <strong>Station de base</strong><br/>
+      MMSI : ${s.mmsi}<br/>
+      Positionnement (EPFD) : ${epfdLabel(s.epfd)}<br/>
+      RAIM : ${s.raim === undefined ? "—" : s.raim ? "Oui" : "Non"}<br/>
+      Heure station : ${stationTime}<br/>
+      Dernière réception : ${updated}
+    </div>`;
 }
 
 function getOrCreateVessel(mmsi) {
@@ -530,6 +620,9 @@ function clearAllVessels() {
   vessels.clear();
   legendDirty = true;
   recomputeLegend();
+
+  stationsLayerGroup.clearLayers();
+  stations.clear();
 }
 
 // --- Légende ---

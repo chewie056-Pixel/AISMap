@@ -25,6 +25,12 @@ html, body {
   font-size: 14px;
 }
 
+#stations-no-config p {
+  margin: 0 0 14px;
+  color: #445;
+  line-height: 1.5;
+}
+
 #stations-content {
   margin-top: 16px;
 }

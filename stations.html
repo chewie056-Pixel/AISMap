@@ -34,9 +34,12 @@
   </p>
 
   <div id="stations-no-config" class="panel hidden">
-    Aucune clé API ou zone géographique n'est configurée. Rendez-vous sur la
-    <a href="index.html">page principale</a> pour vous connecter et définir une
-    zone avant de consulter les stations.
+    <p>
+      Aucune clé API ou zone géographique n'est configurée. Connectez-vous et
+      définissez une zone sur la page principale avant de consulter les
+      stations.
+    </p>
+    <a href="index.html" class="btn-primary-link">Configurer sur la page principale</a>
   </div>
 
   <div id="stations-content" class="hidden">
@@ -57,12 +60,15 @@
           <th>MMSI</th>
           <th>Latitude</th>
           <th>Longitude</th>
+          <th>Positionnement (EPFD)</th>
+          <th>RAIM</th>
+          <th>Heure station</th>
           <th>Dernière réception</th>
         </tr>
       </thead>
       <tbody id="stations-tbody">
         <tr id="stations-empty-row">
-          <td colspan="4">En attente de données…</td>
+          <td colspan="7">En attente de données…</td>
         </tr>
       </tbody>
     </table>

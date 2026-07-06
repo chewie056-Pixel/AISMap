@@ -129,27 +129,13 @@ function handleData(data) {
     return;
   }
 
-  const meta = data.MetaData || {};
-  const report = data.Message?.BaseStationReport;
-  if (!report) {
-    console.debug("AIS: message ignoré (pas un Base Station Report)", data.MessageType);
+  const parsed = parseBaseStationReport(data);
+  if (!parsed) {
+    console.debug("AIS: message ignoré (pas un Base Station Report exploitable)", data.MessageType);
     return;
   }
 
-  const mmsi = meta.MMSI ?? meta.Mmsi ?? report.UserID;
-  if (!mmsi) {
-    console.warn("AIS: station sans MMSI, ignorée", data);
-    return;
-  }
-
-  const lat = meta.latitude ?? meta.Latitude ?? report.Latitude ?? report.latitude;
-  const lon = meta.longitude ?? meta.Longitude ?? report.Longitude ?? report.longitude;
-  if (lat === undefined || lon === undefined) {
-    console.warn("AIS: station sans position exploitable, ignorée", data);
-    return;
-  }
-
-  stations.set(mmsi, { mmsi, lat, lon, lastSeen: Date.now() });
+  stations.set(parsed.mmsi, { ...parsed, lastSeen: Date.now() });
   renderStations();
 }
 
@@ -171,6 +157,9 @@ function renderStations() {
           <td>${s.mmsi}</td>
           <td>${s.lat.toFixed(4)}</td>
           <td>${s.lon.toFixed(4)}</td>
+          <td>${epfdLabel(s.epfd)}</td>
+          <td>${s.raim === undefined ? "—" : s.raim ? "Oui" : "Non"}</td>
+          <td>${s.stationUtc ? s.stationUtc.toLocaleTimeString("fr-FR", { timeZone: "UTC" }) + " UTC" : "—"}</td>
           <td>${new Date(s.lastSeen).toLocaleTimeString("fr-FR")}</td>
         </tr>`
     )

@@ -32,8 +32,12 @@ définie par l'utilisateur.
   le zoom.
 - **Page « Stations »** (`stations.html`, lien 📡 dans le bandeau) : liste les
   stations AIS de base (balises côtières/terrestres, messages *Base Station
-  Report*) qui émettent dans la zone configurée sur la page principale.
-  Réutilise la clé API et la zone déjà enregistrées.
+  Report*) qui émettent dans la zone configurée sur la page principale, avec
+  leurs caractéristiques (type de positionnement EPFD, RAIM, heure UTC de la
+  station). Réutilise la clé API et la zone déjà enregistrées.
+- **Stations sur la carte principale** : un interrupteur dans le bandeau
+  permet d'afficher les stations de base directement sur la carte (icône 📡
+  distincte des navires), avec le détail au clic.
 
 ## Lancer l'application
 

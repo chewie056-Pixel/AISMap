@@ -129,6 +129,24 @@ button:hover {
   background: #2872b8;
 }
 
+.btn-primary-link {
+  display: inline-block;
+  cursor: pointer;
+  border: none;
+  border-radius: 6px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  background: #2E86DE;
+  color: white;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.btn-primary-link:hover {
+  background: #2872b8;
+}
+
 #btn-disconnect {
   background: #e74c3c;
 }
@@ -397,6 +415,27 @@ button:hover {
 .vessel-popup {
   font-size: 12px;
   line-height: 1.5;
+}
+
+.station-icon-wrapper {
+  background: transparent;
+  border: none;
+  opacity: 1 !important;
+}
+
+.station-marker {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  background: #2c3e50;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.6);
+  opacity: 1 !important;
 }
 
 /* Marker cluster styling tweaks to match theme */
