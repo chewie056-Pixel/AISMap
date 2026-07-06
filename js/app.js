@@ -273,20 +273,15 @@ function connect(apiKey) {
   };
 
   ws.onmessage = (evt) => {
-    let data;
-    try {
-      data = JSON.parse(evt.data);
-    } catch (e) {
-      console.warn("AIS: message non-JSON ignoré", evt.data, e);
-      return;
+    // AISStream envoie parfois les frames en binaire : evt.data peut être une
+    // chaîne, un Blob ou un ArrayBuffer selon le navigateur/serveur.
+    if (typeof evt.data === "string") {
+      processRawMessage(evt.data);
+    } else if (evt.data instanceof Blob) {
+      evt.data.text().then(processRawMessage);
+    } else if (evt.data instanceof ArrayBuffer) {
+      processRawMessage(new TextDecoder("utf-8").decode(evt.data));
     }
-    messageCount++;
-    if (messageCount <= 3) {
-      // Aide au diagnostic : affiche la forme brute des premiers messages reçus.
-      console.debug("AIS: message reçu", data);
-    }
-    setStatus("connected", `Connecté — ${messageCount} message(s) reçu(s), ${vessels.size} navire(s) suivi(s)`);
-    handleMessage(data);
   };
 
   ws.onerror = () => {
@@ -301,6 +296,23 @@ function connect(apiKey) {
     setStatus("error", "Connexion perdue — nouvelle tentative…");
     scheduleReconnect();
   };
+}
+
+function processRawMessage(raw) {
+  let data;
+  try {
+    data = JSON.parse(raw);
+  } catch (e) {
+    console.warn("AIS: message non-JSON ignoré", raw, e);
+    return;
+  }
+  messageCount++;
+  if (messageCount <= 3) {
+    // Aide au diagnostic : affiche la forme brute des premiers messages reçus.
+    console.debug("AIS: message reçu", data);
+  }
+  handleMessage(data);
+  setStatus("connected", `Connecté — ${messageCount} message(s) reçu(s), ${vessels.size} navire(s) suivi(s)`);
 }
 
 function scheduleReconnect() {
