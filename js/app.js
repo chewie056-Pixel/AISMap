@@ -658,7 +658,7 @@ function handleMessage(data) {
   if (extendedClassB) {
     upsertExtendedClassB(mmsi, meta, extendedClassB);
   } else if (posReport) {
-    upsertPosition(mmsi, meta, posReport);
+    upsertPosition(mmsi, meta, posReport, type === "StandardClassBPositionReport");
   } else if (type === "ShipStaticData" && data.Message?.ShipStaticData) {
     upsertStatic(mmsi, meta, data.Message.ShipStaticData);
   } else if (staticDataReport) {
@@ -672,11 +672,12 @@ function handleMessage(data) {
 // en plus le nom/type du navire inclus directement dans le même message (pas
 // besoin d'un StaticDataReport séparé pour ces champs).
 function upsertExtendedClassB(mmsi, meta, report) {
-  upsertPosition(mmsi, meta, report);
+  console.debug("AIS: ExtendedClassBPositionReport reçu", { mmsi, report });
+  upsertPosition(mmsi, meta, report, true);
   const v = vessels.get(mmsi);
   if (!v) return;
 
-  const name = (report.Name || meta.ShipName || "").trim();
+  const name = (report.Name || report.ShipName || meta.ShipName || "").trim();
   if (name) v.name = name;
   if (report.ShipType !== undefined) v.category = categorizeShipType(report.ShipType);
 
@@ -830,7 +831,7 @@ function getOrCreateVessel(mmsi) {
   return v;
 }
 
-function upsertPosition(mmsi, meta, pr) {
+function upsertPosition(mmsi, meta, pr, isClassB) {
   const v = getOrCreateVessel(mmsi);
   v.lat = meta.latitude ?? meta.Latitude ?? pr.Latitude ?? pr.latitude;
   v.lon = meta.longitude ?? meta.Longitude ?? pr.Longitude ?? pr.longitude;
@@ -838,6 +839,10 @@ function upsertPosition(mmsi, meta, pr) {
   v.sog = pr.Sog;
   v.heading = pr.TrueHeading;
   v.navStatus = pr.NavigationalStatus;
+  // Les navires Classe B (StandardClassBPositionReport / ExtendedClassBPositionReport)
+  // ne transmettent jamais de statut de navigation : ce n'est pas une donnée
+  // manquante, la norme AIS ne le prévoit que pour la Classe A.
+  if (isClassB) v.isClassB = true;
   if (!v.name && meta.ShipName) v.name = meta.ShipName.trim();
   v.lastUpdate = Date.now();
   if (v.lat === undefined || v.lon === undefined) {
@@ -864,12 +869,13 @@ function upsertStatic(mmsi, meta, sd) {
 // deux parties (A = nom, B = type/indicatif/dimensions) au lieu du message
 // type 5 (ShipStaticData) réservé aux navires Classe A.
 function upsertStaticDataReport(mmsi, meta, sdr) {
+  console.debug("AIS: StaticDataReport reçu", { mmsi, sdr });
   const v = getOrCreateVessel(mmsi);
   const partNumber = sdr.PartNumber ?? sdr.partNumber;
   const reportA = sdr.ReportA ?? (partNumber === 0 ? sdr : null);
   const reportB = sdr.ReportB ?? (partNumber === 1 ? sdr : null);
 
-  const name = (reportA?.Name ?? sdr.Name ?? meta.ShipName ?? "").trim();
+  const name = (reportA?.Name ?? reportA?.ShipName ?? sdr.Name ?? sdr.ShipName ?? meta.ShipName ?? "").trim();
   if (name) v.name = name;
 
   const shipType = reportB?.ShipType ?? sdr.ShipType ?? sdr.Type;
@@ -924,7 +930,7 @@ function popupContent(v) {
       Type : ${cat.label}<br/>
       Vitesse : ${v.sog !== undefined ? v.sog.toFixed(1) + " nds" : "—"}<br/>
       Cap : ${v.cog !== undefined ? v.cog.toFixed(0) + "°" : "—"}<br/>
-      Statut : ${navStatusLabel(v.navStatus)}<br/>
+      Statut : ${v.navStatus === undefined && v.isClassB ? "Non transmis (Classe B)" : navStatusLabel(v.navStatus)}<br/>
       Maj : ${updated}
     </div>`;
 }

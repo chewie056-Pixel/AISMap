@@ -127,7 +127,11 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
   affiche un message si aucune page principale connectée n'est détectée
   après quelques secondes.
 - `PositionReport` / `StandardClassBPositionReport` fournissent la position,
-  la vitesse (SOG), le cap (COG) et le cap vrai (heading).
+  la vitesse (SOG), le cap (COG) et le cap vrai (heading). Les navires Classe B
+  (`StandardClassBPositionReport` / `ExtendedClassBPositionReport`) ne
+  transmettent jamais de statut de navigation (norme AIS) : l'application
+  affiche alors « Non transmis (Classe B) » plutôt qu'un générique « inconnu »
+  qui laisserait penser à une donnée manquante.
 - `ExtendedClassBPositionReport` (type 19) fournit position et nom/type en un
   seul message (navires Classe B qui n'émettent pas de `StaticDataReport`
   séparé).
