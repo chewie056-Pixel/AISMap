@@ -32,6 +32,11 @@
     configurée sur la page principale. Ces stations font partie du réseau qui
     alimente le flux AIS reçu pour cette zone.
     <br /><br />
+    Cette page ne se connecte pas elle-même à AISStream : elle affiche en
+    direct les données reçues par la page principale, ouverte et connectée
+    dans un autre onglet (ceci évite qu'AISStream ne coupe la connexion,
+    ce qui arrive quand plusieurs onglets se connectent avec la même clé).
+    <br /><br />
     <strong>Nom :</strong> les stations de base ne diffusent pas de nom au
     sens AIS ; il n'est affiché que si AISStream l'associe au MMSI.
     <strong>Navires à proximité :</strong> l'AIS ne permet pas de savoir
@@ -48,6 +53,15 @@
       stations.
     </p>
     <a href="index.html" class="btn-primary-link">Configurer sur la page principale</a>
+  </div>
+
+  <div id="stations-no-session" class="panel hidden">
+    <p>
+      Aucune session active détectée. Ouvrez la page principale dans un
+      autre onglet et connectez-vous : les stations s'afficheront ici
+      automatiquement, en direct.
+    </p>
+    <a href="index.html" target="_blank" class="btn-primary-link">Ouvrir la page principale</a>
   </div>
 
   <div id="stations-content" class="hidden">

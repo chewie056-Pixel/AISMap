@@ -22,6 +22,21 @@ let drawRectangle = null;
 const vessels = new Map(); // mmsi -> vessel state
 const stations = new Map(); // mmsi -> station state (Base Station Report)
 
+// Cette page détient la seule connexion WebSocket réelle. Elle diffuse les
+// données/statut aux autres pages (Stations) via ce canal, pour éviter que
+// plusieurs onglets n'ouvrent chacun leur propre connexion (AISStream ferme
+// alors les connexions de façon abrupte).
+const broadcastChannel = new BroadcastChannel(AIS_BROADCAST_CHANNEL);
+let lastStatusState = "disconnected";
+let lastStatusText = "Déconnecté";
+
+broadcastChannel.onmessage = (evt) => {
+  if (evt.data?.type === "request-status") {
+    broadcastChannel.postMessage({ type: "status", state: lastStatusState, text: lastStatusText });
+    if (currentZone) broadcastChannel.postMessage({ type: "zone", zone: currentZone });
+  }
+};
+
 // --- DOM references ---
 const els = {};
 
@@ -278,6 +293,7 @@ function handleModalConnect() {
   currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
   drawZoneRectangle(currentZone);
+  broadcastChannel.postMessage({ type: "zone", zone: currentZone });
   map.fitBounds(zoneRectangle.getBounds(), { padding: [40, 40] });
 
   if (els.rememberKey.checked) {
@@ -319,6 +335,7 @@ function applyNewZone(zone) {
   currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
   drawZoneRectangle(currentZone);
+  broadcastChannel.postMessage({ type: "zone", zone: currentZone });
 
   if (currentApiKey) {
     reconnectWithCurrentZone();
@@ -483,6 +500,7 @@ function onAisData(data) {
     // Aide au diagnostic : affiche la forme brute des premiers messages reçus.
     console.debug("AIS: message reçu", data);
   }
+  broadcastChannel.postMessage({ type: "data", payload: data });
   handleMessage(data);
 
   const now = Date.now();
@@ -532,6 +550,10 @@ function setStatus(state, text) {
   const busy = state === "connected" || state === "connecting";
   els.btnConnect.classList.toggle("hidden", busy);
   els.btnDisconnect.classList.toggle("hidden", !busy);
+
+  lastStatusState = state;
+  lastStatusText = text;
+  broadcastChannel.postMessage({ type: "status", state, text });
 }
 
 // --- Traitement des messages AIS ---

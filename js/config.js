@@ -30,3 +30,9 @@ const STORAGE_KEY_SHOW_STATIONS = "aisstream_show_stations";
 
 const RECONNECT_BASE_DELAY_MS = 2000;
 const RECONNECT_MAX_DELAY_MS = 30000;
+
+// AISStream ferme la connexion (souvent abruptement, code 1006) si plusieurs
+// onglets ouvrent chacun leur propre WebSocket avec la même clé API. Une
+// seule page (la page principale) détient donc la connexion réelle ; les
+// autres pages (Stations) reçoivent les données via ce canal partagé.
+const AIS_BROADCAST_CHANNEL = "aistracker";

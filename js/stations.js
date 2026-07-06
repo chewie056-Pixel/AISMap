@@ -1,16 +1,21 @@
 // Page "Stations" — liste les stations AIS de base (Base Station Report,
 // message AIS type 4) qui émettent dans la zone configurée sur la page
-// principale. Réutilise la clé API et la zone déjà enregistrées.
+// principale.
+//
+// Cette page n'ouvre PAS sa propre connexion WebSocket : AISStream ferme les
+// connexions de façon abrupte (code 1006) dès que plusieurs onglets ouvrent
+// chacun une connexion avec la même clé API. Elle reçoit donc les données en
+// direct via BroadcastChannel, relayées par la page principale (index.html),
+// qui doit être ouverte et connectée dans un autre onglet.
 
-let ws = null;
-let reconnectAttempts = 0;
-let reconnectTimer = null;
 let renderDirty = false;
+let receivedAnyBroadcast = false;
 
 const stations = new Map(); // mmsi -> { mmsi, lat, lon, lastSeen, ... }
 const vesselPositions = new Map(); // mmsi -> { lat, lon } (position seule, pour l'estimation de proximité)
 
 const els = {};
+const broadcastChannel = new BroadcastChannel(AIS_BROADCAST_CHANNEL);
 
 document.addEventListener("DOMContentLoaded", init);
 
@@ -18,19 +23,28 @@ function init() {
   cacheDomRefs();
   els.proximityRadius.textContent = STATION_PROXIMITY_RADIUS_KM;
 
-  const apiKey = localStorage.getItem(STORAGE_KEY_API);
   const zone = loadZone();
-
-  if (!apiKey || !zone) {
+  if (!localStorage.getItem(STORAGE_KEY_API) || !zone) {
     els.noConfig.classList.remove("hidden");
     els.content.classList.add("hidden");
+    els.noSession.classList.add("hidden");
     return;
   }
 
   els.noConfig.classList.add("hidden");
   els.content.classList.remove("hidden");
   showZoneSummary(zone);
-  connect(apiKey, zone);
+  setStatus("connecting", "En attente de la page principale…");
+
+  broadcastChannel.onmessage = (evt) => handleBroadcast(evt.data);
+  broadcastChannel.postMessage({ type: "request-status" });
+
+  setTimeout(() => {
+    if (!receivedAnyBroadcast) {
+      els.noSession.classList.remove("hidden");
+      setStatus("disconnected", "Aucune session active");
+    }
+  }, 4000);
 
   setInterval(() => {
     if (renderDirty) {
@@ -44,6 +58,7 @@ function cacheDomRefs() {
   els.status = document.getElementById("status");
   els.statusText = document.getElementById("status-text");
   els.noConfig = document.getElementById("stations-no-config");
+  els.noSession = document.getElementById("stations-no-session");
   els.content = document.getElementById("stations-content");
   els.zoneNorth = document.getElementById("zone-summary-north");
   els.zoneSouth = document.getElementById("zone-summary-south");
@@ -75,67 +90,23 @@ function showZoneSummary(zone) {
   els.zoneEast.textContent = zone.east;
 }
 
-function zoneBounds(zone) {
-  return [
-    [zone.south, zone.west],
-    [zone.north, zone.east],
-  ];
-}
-
 function setStatus(state, text) {
   els.status.className = "status status-" + state;
   els.statusText.textContent = text;
 }
 
-function connect(apiKey, zone) {
-  setStatus("connecting", "Connexion en cours…");
+function handleBroadcast(msg) {
+  if (!msg) return;
+  receivedAnyBroadcast = true;
+  els.noSession.classList.add("hidden");
 
-  try {
-    ws = new WebSocket(AIS_STREAM_URL);
-  } catch {
-    setStatus("error", "Impossible d'ouvrir la connexion WebSocket");
-    return;
+  if (msg.type === "status") {
+    setStatus(msg.state, msg.text);
+  } else if (msg.type === "zone") {
+    showZoneSummary(msg.zone);
+  } else if (msg.type === "data") {
+    handleData(msg.payload);
   }
-
-  ws.onopen = () => {
-    reconnectAttempts = 0;
-    ws.send(
-      JSON.stringify({
-        APIKey: apiKey,
-        BoundingBoxes: [zoneBounds(zone)],
-        FilterMessageTypes: ["BaseStationReport", "PositionReport", "StandardClassBPositionReport"],
-      })
-    );
-    setStatus("connected", "Connecté — en attente de stations…");
-  };
-
-  ws.onmessage = (evt) => readAisMessage(evt, handleData);
-
-  ws.onerror = (evt) => {
-    console.error("AIS: erreur WebSocket", evt);
-    setStatus("error", "Erreur de connexion");
-  };
-
-  ws.onclose = (evt) => {
-    console.warn("AIS: connexion fermée", {
-      code: evt.code,
-      reason: evt.reason,
-      wasClean: evt.wasClean,
-    });
-    const codeInfo = evt.code ? ` (code ${evt.code}${evt.reason ? " — " + evt.reason : ""})` : "";
-    setStatus("error", `Connexion perdue${codeInfo} — nouvelle tentative…`);
-    scheduleReconnect(apiKey, zone);
-  };
-}
-
-function scheduleReconnect(apiKey, zone) {
-  reconnectAttempts++;
-  const delay = Math.min(
-    RECONNECT_BASE_DELAY_MS * 2 ** (reconnectAttempts - 1),
-    RECONNECT_MAX_DELAY_MS
-  );
-  clearTimeout(reconnectTimer);
-  reconnectTimer = setTimeout(() => connect(apiKey, zone), delay);
 }
 
 function handleData(data) {

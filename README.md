@@ -40,9 +40,13 @@ définie par l'utilisateur.
   leurs caractéristiques (type de positionnement EPFD, RAIM, heure UTC de la
   station, nom si AISStream l'associe au MMSI) et une estimation du nombre de
   navires suivis à proximité (rayon configurable, `STATION_PROXIMITY_RADIUS_KM`
-  dans `js/config.js`). Réutilise la clé API et la zone déjà enregistrées.
+  dans `js/config.js`).
   ⚠️ L'AIS ne relie pas un message navire à la station qui l'a reçu : ce
   nombre est une estimation géographique, pas un décompte réel de réception.
+  Cette page n'ouvre **pas** sa propre connexion : elle affiche les données
+  reçues par la page principale (ouverte et connectée dans un autre onglet),
+  relayées via `BroadcastChannel` — voir la note ci-dessous sur les
+  connexions multiples.
 - **Stations sur la carte principale** : un interrupteur dans le bandeau
   permet d'afficher les stations de base directement sur la carte (icône 📡
   distincte des navires), avec le détail au clic.
@@ -84,9 +88,11 @@ css/stations.css   Styles spécifiques à la page Stations
 js/config.js       Constantes (seuils de zoom, clés de stockage, etc.)
 js/shipTypes.js    Classification des types de navires AIS et couleurs
 js/ws-utils.js     Décodage partagé des messages WebSocket AISStream
-js/app.js          Logique principale : WebSocket AISStream, carte Leaflet,
-                   gestion de la zone, clustering, légende
-js/stations.js     Logique de la page Stations
+js/app.js          Logique principale : seule connexion WebSocket réelle,
+                   carte Leaflet, gestion de la zone, clustering, légende,
+                   diffusion des données via BroadcastChannel
+js/stations.js     Page Stations : reçoit les données via BroadcastChannel
+                   (n'ouvre pas de connexion WebSocket propre)
 vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
 ```
 
@@ -104,10 +110,15 @@ vendor/            Leaflet + Leaflet.markercluster embarqués (pas de CDN)
     ]
   }
   ```
-  La page Stations ouvre une connexion séparée filtrée sur
-  `["BaseStationReport", "PositionReport", "StandardClassBPositionReport"]`
-  pour la même zone (les positions ne servent qu'à l'estimation de
-  proximité, aucune donnée de navire n'y est autrement affichée).
+- **Une seule connexion WebSocket par session de navigation.** AISStream
+  ferme les connexions de façon abrupte (code `1006`, sans raison) dès que
+  plusieurs onglets ouvrent chacun leur propre connexion avec la même clé
+  API. La page principale (`index.html`) est donc la seule à appeler
+  `new WebSocket(...)` ; elle diffuse chaque message reçu, changement de
+  statut et changement de zone via `BroadcastChannel("aistracker")`. La page
+  Stations s'abonne à ce canal au lieu d'ouvrir sa propre connexion, et
+  affiche un message si aucune page principale connectée n'est détectée
+  après quelques secondes.
 - `PositionReport` / `StandardClassBPositionReport` fournissent la position,
   la vitesse (SOG), le cap (COG) et le cap vrai (heading).
 - `ShipStaticData` (type 5, navires Classe A) et `StaticDataReport` (type 24,
