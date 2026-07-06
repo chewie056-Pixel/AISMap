@@ -10,6 +10,8 @@ let currentApiKey = null;
 let currentZone = { ...DEFAULT_ZONE }; // modifiable par l'utilisateur avant connexion
 let legendDirty = true;
 let messageCount = 0;
+let visibleVesselCount = 0;
+let lastStatusUpdate = 0;
 
 const vessels = new Map(); // mmsi -> vessel state
 
@@ -262,6 +264,7 @@ function connect(apiKey) {
   ws.onopen = () => {
     reconnectAttempts = 0;
     messageCount = 0;
+    lastStatusUpdate = 0;
     ws.send(
       JSON.stringify({
         APIKey: apiKey,
@@ -312,7 +315,15 @@ function processRawMessage(raw) {
     console.debug("AIS: message reçu", data);
   }
   handleMessage(data);
-  setStatus("connected", `Connecté — ${messageCount} message(s) reçu(s), ${vessels.size} navire(s) suivi(s)`);
+
+  const now = Date.now();
+  if (now - lastStatusUpdate > 1000) {
+    lastStatusUpdate = now;
+    setStatus(
+      "connected",
+      `Connecté — ${messageCount} message(s) reçu(s), ${visibleVesselCount} navire(s) dans la vue`
+    );
+  }
 }
 
 function scheduleReconnect() {
@@ -515,6 +526,8 @@ function recomputeLegend() {
     counts[v.category] = (counts[v.category] || 0) + 1;
     total++;
   }
+
+  visibleVesselCount = total;
 
   els.legendList.innerHTML = "";
   for (const cat of LEGEND_ORDER) {
