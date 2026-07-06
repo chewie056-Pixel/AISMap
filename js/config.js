@@ -18,6 +18,11 @@ const CLUSTER_DISABLE_ZOOM = 8;
 const STALE_VESSEL_MS = 15 * 60 * 1000; // 15 min sans mise à jour -> retrait
 const STALE_CHECK_INTERVAL_MS = 60 * 1000;
 
+// AIS ne relie pas un message navire à la station qui l'a reçu : ce rayon
+// sert uniquement à estimer les navires "à proximité" d'une station (portée
+// VHF/AIS typique), ce n'est pas une donnée de réception réelle.
+const STATION_PROXIMITY_RADIUS_KM = 74; // ~40 milles nautiques
+
 const STORAGE_KEY_API = "aisstream_api_key";
 const STORAGE_KEY_ZONE = "aisstream_zone";
 const STORAGE_KEY_AGGREGATION = "aisstream_aggregation";

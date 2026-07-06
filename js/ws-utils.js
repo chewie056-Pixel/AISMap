@@ -56,6 +56,10 @@ function parseBaseStationReport(data) {
   const epfd = report.Epfd ?? report.EPFD ?? report.FixType ?? report.Type;
   const raim = report.Raim ?? report.RAIM ?? report.RaimFlag;
 
+  // Une station de base AIS ne diffuse pas de nom (norme AIS type 4) ; ce
+  // champ n'est renseigné que si AISStream l'associe à ce MMSI par ailleurs.
+  const name = meta.ShipName ? meta.ShipName.trim() : null;
+
   const year = report.UtcYear ?? report.Year;
   const month = report.UtcMonth ?? report.Month;
   const day = report.UtcDay ?? report.Day;
@@ -67,5 +71,19 @@ function parseBaseStationReport(data) {
     stationUtc = new Date(Date.UTC(year, month - 1, day, hour, minute, second ?? 0));
   }
 
-  return { mmsi, lat, lon, epfd, raim, stationUtc };
+  return { mmsi, lat, lon, epfd, raim, stationUtc, name };
+}
+
+// Distance orthodromique (km) entre deux points — sert uniquement à estimer
+// les navires "à proximité" d'une station, faute de lien direct dans les
+// données AIS entre un message navire et la station qui l'a reçu.
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
 }

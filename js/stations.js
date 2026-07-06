@@ -5,8 +5,10 @@
 let ws = null;
 let reconnectAttempts = 0;
 let reconnectTimer = null;
+let renderDirty = false;
 
-const stations = new Map(); // mmsi -> { mmsi, lat, lon, lastSeen }
+const stations = new Map(); // mmsi -> { mmsi, lat, lon, lastSeen, ... }
+const vesselPositions = new Map(); // mmsi -> { lat, lon } (position seule, pour l'estimation de proximité)
 
 const els = {};
 
@@ -14,6 +16,7 @@ document.addEventListener("DOMContentLoaded", init);
 
 function init() {
   cacheDomRefs();
+  els.proximityRadius.textContent = STATION_PROXIMITY_RADIUS_KM;
 
   const apiKey = localStorage.getItem(STORAGE_KEY_API);
   const zone = loadZone();
@@ -28,6 +31,13 @@ function init() {
   els.content.classList.remove("hidden");
   showZoneSummary(zone);
   connect(apiKey, zone);
+
+  setInterval(() => {
+    if (renderDirty) {
+      renderStations();
+      renderDirty = false;
+    }
+  }, 2000);
 }
 
 function cacheDomRefs() {
@@ -43,6 +53,7 @@ function cacheDomRefs() {
   els.tbody = document.getElementById("stations-tbody");
   els.emptyRow = document.getElementById("stations-empty-row");
   els.error = document.getElementById("stations-error");
+  els.proximityRadius = document.getElementById("proximity-radius");
 }
 
 function loadZone() {
@@ -92,7 +103,7 @@ function connect(apiKey, zone) {
       JSON.stringify({
         APIKey: apiKey,
         BoundingBoxes: [zoneBounds(zone)],
-        FilterMessageTypes: ["BaseStationReport"],
+        FilterMessageTypes: ["BaseStationReport", "PositionReport", "StandardClassBPositionReport"],
       })
     );
     setStatus("connected", "Connecté — en attente de stations…");
@@ -129,14 +140,38 @@ function handleData(data) {
     return;
   }
 
-  const parsed = parseBaseStationReport(data);
-  if (!parsed) {
-    console.debug("AIS: message ignoré (pas un Base Station Report exploitable)", data.MessageType);
+  const stationReport = parseBaseStationReport(data);
+  if (stationReport) {
+    stations.set(stationReport.mmsi, { ...stationReport, lastSeen: Date.now() });
+    renderDirty = true;
     return;
   }
 
-  stations.set(parsed.mmsi, { ...parsed, lastSeen: Date.now() });
-  renderStations();
+  const posReport =
+    data.Message?.PositionReport || data.Message?.StandardClassBPositionReport;
+  if (posReport) {
+    const meta = data.MetaData || {};
+    const mmsi = meta.MMSI ?? meta.Mmsi ?? posReport.UserID;
+    const lat = meta.latitude ?? meta.Latitude ?? posReport.Latitude ?? posReport.latitude;
+    const lon = meta.longitude ?? meta.Longitude ?? posReport.Longitude ?? posReport.longitude;
+    if (mmsi && lat !== undefined && lon !== undefined) {
+      vesselPositions.set(mmsi, { lat, lon });
+      renderDirty = true;
+    }
+  }
+}
+
+// Nombre de navires actuellement suivis dans un rayon de la station. AIS ne
+// relie pas un message navire à la station qui l'a reçu : il s'agit d'une
+// estimation par proximité géographique, pas d'un décompte réel de réception.
+function countNearbyVessels(station) {
+  let count = 0;
+  for (const pos of vesselPositions.values()) {
+    if (haversineKm(station.lat, station.lon, pos.lat, pos.lon) <= STATION_PROXIMITY_RADIUS_KM) {
+      count++;
+    }
+  }
+  return count;
 }
 
 function renderStations() {
@@ -155,11 +190,13 @@ function renderStations() {
       (s) => `
         <tr>
           <td>${s.mmsi}</td>
+          <td>${s.name || "—"}</td>
           <td>${s.lat.toFixed(4)}</td>
           <td>${s.lon.toFixed(4)}</td>
           <td>${epfdLabel(s.epfd)}</td>
           <td>${s.raim === undefined ? "—" : s.raim ? "Oui" : "Non"}</td>
           <td>${s.stationUtc ? s.stationUtc.toLocaleTimeString("fr-FR", { timeZone: "UTC" }) + " UTC" : "—"}</td>
+          <td>${countNearbyVessels(s)}</td>
           <td>${new Date(s.lastSeen).toLocaleTimeString("fr-FR")}</td>
         </tr>`
     )

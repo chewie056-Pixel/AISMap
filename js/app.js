@@ -350,6 +350,7 @@ function connect(apiKey) {
           "PositionReport",
           "StandardClassBPositionReport",
           "ShipStaticData",
+          "StaticDataReport",
           "BaseStationReport",
         ],
       })
@@ -451,8 +452,13 @@ function handleMessage(data) {
   const meta = data.MetaData || {};
   const posReport =
     data.Message?.PositionReport || data.Message?.StandardClassBPositionReport;
+  const staticDataReport = data.Message?.StaticDataReport;
   const mmsi =
-    meta.MMSI ?? meta.Mmsi ?? posReport?.UserID ?? data.Message?.ShipStaticData?.UserID;
+    meta.MMSI ??
+    meta.Mmsi ??
+    posReport?.UserID ??
+    data.Message?.ShipStaticData?.UserID ??
+    staticDataReport?.UserID;
 
   if (!mmsi) {
     console.warn("AIS: MMSI introuvable dans le message, ignoré", data);
@@ -463,6 +469,8 @@ function handleMessage(data) {
     upsertPosition(mmsi, meta, posReport);
   } else if (type === "ShipStaticData" && data.Message?.ShipStaticData) {
     upsertStatic(mmsi, meta, data.Message.ShipStaticData);
+  } else if (staticDataReport) {
+    upsertStaticDataReport(mmsi, meta, staticDataReport);
   } else {
     console.debug("AIS: type de message non traité", type);
   }
@@ -509,7 +517,7 @@ function stationPopupContent(s) {
     : "—";
   return `
     <div class="vessel-popup">
-      <strong>Station de base</strong><br/>
+      <strong>${s.name || "Station de base"}</strong><br/>
       MMSI : ${s.mmsi}<br/>
       Positionnement (EPFD) : ${epfdLabel(s.epfd)}<br/>
       RAIM : ${s.raim === undefined ? "—" : s.raim ? "Oui" : "Non"}<br/>
@@ -550,6 +558,28 @@ function upsertStatic(mmsi, meta, sd) {
   const name = (sd.Name || meta.ShipName || "").trim();
   if (name) v.name = name;
   v.category = categorizeShipType(sd.Type);
+  v.lastUpdate = v.lastUpdate || Date.now();
+  if (v.marker) {
+    v.marker.setIcon(vesselIcon(v));
+  }
+  legendDirty = true;
+}
+
+// AIS type 24 (Static Data Report) : utilisé par les navires Classe B, en
+// deux parties (A = nom, B = type/indicatif/dimensions) au lieu du message
+// type 5 (ShipStaticData) réservé aux navires Classe A.
+function upsertStaticDataReport(mmsi, meta, sdr) {
+  const v = getOrCreateVessel(mmsi);
+  const partNumber = sdr.PartNumber ?? sdr.partNumber;
+  const reportA = sdr.ReportA ?? (partNumber === 0 ? sdr : null);
+  const reportB = sdr.ReportB ?? (partNumber === 1 ? sdr : null);
+
+  const name = (reportA?.Name ?? sdr.Name ?? meta.ShipName ?? "").trim();
+  if (name) v.name = name;
+
+  const shipType = reportB?.ShipType ?? sdr.ShipType ?? sdr.Type;
+  if (shipType !== undefined) v.category = categorizeShipType(shipType);
+
   v.lastUpdate = v.lastUpdate || Date.now();
   if (v.marker) {
     v.marker.setIcon(vesselIcon(v));

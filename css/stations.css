@@ -4,7 +4,7 @@ html, body {
 }
 
 #stations-page {
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 84px 20px 40px;
 }
@@ -47,17 +47,22 @@ html, body {
   margin-bottom: 12px;
 }
 
+.stations-table-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
 #stations-table {
   width: 100%;
+  min-width: 780px;
   border-collapse: collapse;
   background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 #stations-table th,
 #stations-table td {
+  white-space: nowrap;
   text-align: left;
   padding: 9px 14px;
   font-size: 13px;

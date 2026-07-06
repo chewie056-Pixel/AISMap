@@ -31,6 +31,14 @@
     <em>Base Station Report</em>) qui émettent dans la zone géographique
     configurée sur la page principale. Ces stations font partie du réseau qui
     alimente le flux AIS reçu pour cette zone.
+    <br /><br />
+    <strong>Nom :</strong> les stations de base ne diffusent pas de nom au
+    sens AIS ; il n'est affiché que si AISStream l'associe au MMSI.
+    <strong>Navires à proximité :</strong> l'AIS ne permet pas de savoir
+    quels navires ont été reçus par quelle station — ce nombre est une
+    estimation du nombre de navires suivis situés à moins de
+    <span id="proximity-radius"></span> km de la station, pas un décompte réel
+    de réception.
   </p>
 
   <div id="stations-no-config" class="panel hidden">
@@ -54,24 +62,28 @@
       <span id="stations-total-count">0</span> station(s) détectée(s)
     </div>
 
+    <div class="stations-table-wrap">
     <table id="stations-table">
       <thead>
         <tr>
           <th>MMSI</th>
+          <th>Nom</th>
           <th>Latitude</th>
           <th>Longitude</th>
           <th>Positionnement (EPFD)</th>
           <th>RAIM</th>
           <th>Heure station</th>
+          <th>Navires à proximité</th>
           <th>Dernière réception</th>
         </tr>
       </thead>
       <tbody id="stations-tbody">
         <tr id="stations-empty-row">
-          <td colspan="7">En attente de données…</td>
+          <td colspan="9">En attente de données…</td>
         </tr>
       </tbody>
     </table>
+    </div>
 
     <p id="stations-error" class="login-error hidden"></p>
   </div>
