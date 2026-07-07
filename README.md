@@ -16,7 +16,10 @@ le navigateur affiche tout ça sur une carte Leaflet.
   AIS côté serveur, ni un enregistrement en cours.
 - **Zone géographique définie par l'utilisateur** : boîte englobante
   Nord/Sud/Ouest/Est, modifiable à tout moment depuis le menu **🗺️ Carte**
-  (valeurs numériques ou dessin direct sur la carte). Le serveur reconnecte
+  (valeurs numériques ou dessin direct sur la carte). Le formulaire de
+  connexion propose aussi de dessiner la zone directement (bouton
+  ✏️ dans la fenêtre), et peut être fermé à tout moment (croix en haut à
+  droite) sans perdre la configuration déjà active. Le serveur reconnecte
   automatiquement AISStream sur la nouvelle zone.
 - **Carte mondiale** avec la zone surveillée encadrée par un rectangle,
   affichage adaptatif selon le zoom (navires individuels au-delà d'un seuil,

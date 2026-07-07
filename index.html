@@ -78,8 +78,9 @@
   </div>
 </header>
 
-<div id="login-modal" class="modal-overlay">
+<div id="login-modal" class="modal-overlay hidden">
   <div class="modal">
+    <button type="button" id="btn-login-modal-close" class="modal-close" title="Fermer" aria-label="Fermer">×</button>
     <h2>Configuration du suivi AIS</h2>
     <p>Entrez votre clé API AISStream.io et la zone géographique (boîte englobante) à surveiller.</p>
     <label for="api-key-input">Clé API</label>
@@ -96,6 +97,7 @@
       <label>Ouest <input type="number" id="setup-zone-west" step="0.1" placeholder="ex. -20" value="-7"></label>
       <label>Est <input type="number" id="setup-zone-east" step="0.1" placeholder="ex. 20" value="7"></label>
     </div>
+    <button type="button" id="btn-setup-draw-zone" class="dropdown-item">✏️ Dessiner la zone sur la carte</button>
 
     <div class="modal-actions">
       <button id="btn-modal-connect">Se connecter</button>

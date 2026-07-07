@@ -72,6 +72,7 @@ function cacheDomRefs() {
   els.drawZoneHint = document.getElementById("draw-zone-hint");
 
   els.loginModal = document.getElementById("login-modal");
+  els.btnLoginModalClose = document.getElementById("btn-login-modal-close");
   els.apiKeyInput = document.getElementById("api-key-input");
   els.rememberKey = document.getElementById("remember-key");
   els.btnModalConnect = document.getElementById("btn-modal-connect");
@@ -80,6 +81,7 @@ function cacheDomRefs() {
   els.setupZoneSouth = document.getElementById("setup-zone-south");
   els.setupZoneWest = document.getElementById("setup-zone-west");
   els.setupZoneEast = document.getElementById("setup-zone-east");
+  els.btnSetupDrawZone = document.getElementById("btn-setup-draw-zone");
 
   els.zoneNorth = document.getElementById("zone-north");
   els.zoneSouth = document.getElementById("zone-south");
@@ -281,6 +283,8 @@ function wireUi() {
   });
   els.btnZoneApply.addEventListener("click", applyZoneFromInputs);
   els.btnModalConnect.addEventListener("click", handleModalConnect);
+  els.btnLoginModalClose.addEventListener("click", hideLoginModal);
+  els.btnSetupDrawZone.addEventListener("click", startZoneDrawingFromModal);
   els.aggregationToggle.addEventListener("change", () => {
     setAggregationEnabled(els.aggregationToggle.checked);
   });
@@ -382,6 +386,7 @@ function applyZoneFromInputs() {
 // Définit la nouvelle zone active, la persiste, redessine le rectangle et
 // demande au serveur de reconnecter le flux AISStream dessus si déjà configuré.
 function applyNewZone(zone) {
+  if (!zone) return;
   currentZone = zone;
   localStorage.setItem(STORAGE_KEY_ZONE, JSON.stringify(currentZone));
   drawZoneRectangle(currentZone);
@@ -392,18 +397,35 @@ function applyNewZone(zone) {
 }
 
 // --- Dessin de la zone directement sur la carte ---
+//
+// Utilisé à la fois par le menu Carte (applique et reconnecte immédiatement)
+// et par le formulaire de connexion (pré-remplit juste les champs, sans
+// connecter). onZoneDrawn reçoit la zone dessinée, ou null en cas d'annulation.
 
 const MIN_DRAWN_ZONE_SPAN_DEG = 0.05;
+let onZoneDrawn = null;
 
 function toggleZoneDrawing() {
   if (drawingZone) {
     cancelZoneDrawing();
   } else {
-    startZoneDrawing();
+    startZoneDrawing(applyNewZone);
   }
 }
 
-function startZoneDrawing() {
+function startZoneDrawingFromModal() {
+  hideLoginModal();
+  startZoneDrawing((zone) => {
+    if (zone) {
+      currentZone = zone;
+      drawZoneRectangle(currentZone);
+    }
+    showLoginModal();
+  });
+}
+
+function startZoneDrawing(onComplete) {
+  onZoneDrawn = onComplete;
   drawingZone = true;
   els.btnDrawZone.classList.add("active");
   els.drawZoneHint.classList.remove("hidden");
@@ -438,8 +460,12 @@ function onDrawMouseUp() {
 }
 
 function finishZoneDrawing(bounds) {
+  const callback = onZoneDrawn;
   resetDrawingState();
-  if (!bounds) return;
+  if (!bounds) {
+    callback?.(null);
+    return;
+  }
 
   const north = bounds.getNorth();
   const south = bounds.getSouth();
@@ -447,21 +473,25 @@ function finishZoneDrawing(bounds) {
   const east = bounds.getEast();
 
   if (north - south < MIN_DRAWN_ZONE_SPAN_DEG || east - west < MIN_DRAWN_ZONE_SPAN_DEG) {
-    return; // simple clic sans glisser : rectangle dégénéré, on ignore
+    callback?.(null); // simple clic sans glisser : rectangle dégénéré
+    return;
   }
 
-  applyNewZone({ north, south, west, east });
+  callback?.({ north, south, west, east });
 }
 
 function cancelZoneDrawing() {
   map.off("mousedown", onDrawMouseDown);
   map.off("mouseup", onDrawMouseUp);
+  const callback = onZoneDrawn;
   resetDrawingState();
+  callback?.(null);
 }
 
 function resetDrawingState() {
   drawingZone = false;
   drawStartLatLng = null;
+  onZoneDrawn = null;
   els.btnDrawZone.classList.remove("active");
   els.drawZoneHint.classList.add("hidden");
   map.off("mousemove", onDrawMouseMove);
@@ -548,11 +578,14 @@ function handleServerMessage(msg) {
       break;
     case "config":
       serverConfigured = msg.configured;
-      if (msg.zone) {
+      if (msg.zone && !drawingZone) {
         currentZone = msg.zone;
         drawZoneRectangle(currentZone);
       }
-      if (!serverConfigured) showLoginModal();
+      if (!drawingZone) {
+        if (serverConfigured) hideLoginModal();
+        else showLoginModal();
+      }
       break;
     case "data":
       if (!replayModeActive) onAisData(msg.payload);
