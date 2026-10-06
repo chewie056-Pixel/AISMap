@@ -126,9 +126,9 @@ function updateAggregationFootnote() {
 function initMap() {
   map = L.map("map", { worldCopyJump: true, minZoom: 2 }).setView([20, 0], 2);
 
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors",
-    maxZoom: 18,
+  L.tileLayer("https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png", {
+    attribution: "&copy; OpenStreetMap France | &copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors",
+    maxZoom: 20,
   }).addTo(map);
 
   if (currentZone) {
