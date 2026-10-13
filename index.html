@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AISMap - Analyse des données AIS</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AISMap - Analyse des données AIS</h1>
+        </header>
+        
+        <div class="tabs-container">
+            <button class="tab-button active" data-tab="upload">Charger JSON</button>
+            <button class="tab-button" data-tab="visualization">Visualisation</button>
+        </div>
+
+        <div class="tab-content" id="upload">
+            <div class="upload-section">
+                <h2>Charger un fichier JSON</h2>
+                <p>Sélectionnez un fichier JSON contenant les données AIS (détections de bateaux avec timestamps).</p>
+                
+                <div class="file-upload">
+                    <input type="file" id="jsonFile" accept=".json" />
+                    <label for="jsonFile" class="upload-button">
+                        <span class="button-text">Choisir un fichier</span>
+                        <span class="file-name" id="fileName">Aucun fichier sélectionné</span>
+                    </label>
+                </div>
+                
+                <div class="file-info" id="fileInfo">
+                    <p>Fichier : <span id="loadedFileName">-</span></p>
+                    <p>Taille : <span id="fileSize">-</span></p>
+                    <p>Nombre de détections : <span id="detectionCount">-</span></p>
+                    <p>Période : <span id="timeRange">-</span></p>
+                </div>
+                
+                <button id="processBtn" class="process-button" disabled>Traiter les données</button>
+            </div>
+        </div>
+
+        <div class="tab-content" id="visualization" style="display: none;">
+            <div class="visualization-section">
+                <h2>Visualisation des données</h2>
+                
+                <div class="chart-container">
+                    <canvas id="boatChart"></canvas>
+                </div>
+                
+                <div class="chart-controls">
+                    <div class="time-aggregation">
+                        <label for="timeAggregation">Agrégation par :</label>
+                        <select id="timeAggregation">
+                            <option value="hour">Heure</option>
+                            <option value="minute">Minute</option>
+                            <option value="day">Jour</option>
+                        </select>
+                    </div>
+                    
+                    <div class="chart-type">
+                        <label for="chartType">Type de graphique :</label>
+                        <select id="chartType">
+                            <option value="bar">Barres</option>
+                            <option value="line">Ligne</option>
+                        </select>
+                    </div>
+                    
+                    <button id="updateChartBtn" class="update-button">Mettre à jour</button>
+                </div>
+                
+                <div class="hover-info" id="hoverInfo">
+                    <p>Passez la souris sur le graphique pour voir les détails</p>
+                </div>
+                
+                <div class="stats-summary">
+                    <h3>Résumé statistique</h3>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label">Total bateaux :</span>
+                            <span class="stat-value" id="totalBoats">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Pic maximum :</span>
+                            <span class="stat-value" id="maxBoats">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Moyenne/heure :</span>
+                            <span class="stat-value" id="avgBoats">-</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Période couverte :</span>
+                            <span class="stat-value" id="periodCovered">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
