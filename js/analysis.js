@@ -388,26 +388,31 @@
             let offsetSeconds = 0;
             
             switch (aggregation) {
-                case '10min':
-                    // Agrégation par buckets de 10 minutes depuis le début
-                    const bucketIndex = Math.floor(diffMinutes / 10);
-                    key = `bucket_${bucketIndex}`;
-                    
-                    // Temps du début du bucket
-                    offsetSeconds = bucketIndex * 10 * 60;
+                case '2min':
+                    // Agrégation par buckets de 2 minutes depuis le début
+                    const bucketIndex2 = Math.floor(diffMinutes / 2);
+                    key = `bucket2_${bucketIndex2}`;
+                    offsetSeconds = bucketIndex2 * 2 * 60;
                     formattedTime = formatOffset(offsetSeconds);
                     timeLabel = formattedTime;
                     break;
                     
-                case 'day':
-                    key = timestamp.toISOString().slice(0, 10);
-                    formattedTime = timestamp.toLocaleString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    });
+                case '10min':
+                    // Agrégation par buckets de 10 minutes depuis le début
+                    const bucketIndex10 = Math.floor(diffMinutes / 10);
+                    key = `bucket10_${bucketIndex10}`;
+                    offsetSeconds = bucketIndex10 * 10 * 60;
+                    formattedTime = formatOffset(offsetSeconds);
                     timeLabel = formattedTime;
-                    offsetSeconds = diffMs / 1000;
+                    break;
+                    
+                case '30min':
+                    // Agrégation par buckets de 30 minutes depuis le début
+                    const bucketIndex30 = Math.floor(diffMinutes / 30);
+                    key = `bucket30_${bucketIndex30}`;
+                    offsetSeconds = bucketIndex30 * 30 * 60;
+                    formattedTime = formatOffset(offsetSeconds);
+                    timeLabel = formattedTime;
                     break;
                     
                 default: // hour
