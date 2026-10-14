@@ -367,9 +367,15 @@
             let timeLabel = '';
             
             switch (aggregation) {
-                case 'minute':
-                    key = timestamp.toISOString().slice(0, 16);
-                    formattedTime = timestamp.toLocaleString('fr-FR', {
+                case '10min':
+                    // Arrondir à 10 minutes
+                    const minutes = timestamp.getMinutes();
+                    const roundedMinutes = Math.floor(minutes / 10) * 10;
+                    const roundedDate = new Date(timestamp);
+                    roundedDate.setMinutes(roundedMinutes, 0, 0);
+                    
+                    key = roundedDate.toISOString().slice(0, 16);
+                    formattedTime = roundedDate.toLocaleString('fr-FR', {
                         hour: '2-digit',
                         minute: '2-digit'
                     });
