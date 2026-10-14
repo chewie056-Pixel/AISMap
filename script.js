@@ -114,8 +114,17 @@ async function processFile() {
         // Afficher les informations du fichier
         detectionCount.textContent = boatData.length;
         
-        // Extraire les timestamps
+        // Extraire les timestamps - Support de plusieurs formats
         const timestamps = boatData.map(d => {
+            // Format 1: timestamp Unix en millisecondes (champ 't')
+            if (d.t !== undefined) {
+                return new Date(d.t);
+            }
+            // Format 2: time_utc dans data.MetaData
+            if (d.data && d.data.MetaData && d.data.MetaData.time_utc) {
+                return new Date(d.data.MetaData.time_utc);
+            }
+            // Format 3: timestamp standard
             if (d.timestamp) return new Date(d.timestamp);
             if (d.time) return new Date(d.time);
             if (d.date) return new Date(d.date);
@@ -277,9 +286,19 @@ function aggregateData(data, aggregation) {
     const timeMap = new Map();
     
     data.forEach(detection => {
-        // Extraire le timestamp
+        // Extraire le timestamp - Support de plusieurs formats
         let timestamp = null;
-        if (detection.timestamp) timestamp = new Date(detection.timestamp);
+        
+        // Format 1: timestamp Unix en millisecondes (champ 't')
+        if (detection.t !== undefined) {
+            timestamp = new Date(detection.t);
+        }
+        // Format 2: time_utc dans data.MetaData
+        else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
+            timestamp = new Date(detection.data.MetaData.time_utc);
+        }
+        // Format 3: timestamp standard
+        else if (detection.timestamp) timestamp = new Date(detection.timestamp);
         else if (detection.time) timestamp = new Date(detection.time);
         else if (detection.date) timestamp = new Date(detection.date);
         else if (detection.detectionTime) timestamp = new Date(detection.detectionTime);
@@ -315,7 +334,7 @@ function aggregateData(data, aggregation) {
                 key = timestamp.toISOString().slice(0, 13); // YYYY-MM-DDTHH
                 formattedTime = timestamp.toLocaleString('fr-FR', {
                     hour: '2-digit',
-                    minute: '00'
+                    minute: '2-digit'
                 });
                 timeLabel = formattedTime;
         }
