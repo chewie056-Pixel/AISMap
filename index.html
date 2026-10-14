@@ -151,7 +151,7 @@
     </div>
 
     <div class="analysis-tab-content" id="analysis-upload">
-      <p>Sélectionnez un fichier JSON contenant les données AIS enregistrées.</p>
+      <p>Sélectionnez un fichier JSON contenant les données AIS enregistrées (compte les bateaux uniques par MMSI).</p>
       
       <div class="file-upload">
         <input type="file" id="analysis-jsonFile" accept=".json" />
@@ -164,7 +164,7 @@
       <div class="file-info" id="analysis-fileInfo">
         <p>Fichier : <span id="analysis-loadedFileName">-</span></p>
         <p>Taille : <span id="analysis-fileSize">-</span></p>
-        <p>Détections : <span id="analysis-detectionCount">-</span></p>
+        <p>Bateaux uniques : <span id="analysis-detectionCount">-</span></p>
         <p>Période : <span id="analysis-timeRange">-</span></p>
       </div>
       
@@ -203,7 +203,7 @@
         <h3>Résumé statistique</h3>
         <div class="stats-grid">
           <div class="stat-card">
-            <span class="stat-label">Total bateaux :</span>
+            <span class="stat-label">Total bateaux uniques :</span>
             <span class="stat-value" id="analysis-totalBoats">-</span>
           </div>
           <div class="stat-card">

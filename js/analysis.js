@@ -241,7 +241,7 @@
             data: {
                 labels: labels,
                 datasets: [{
-                    label: 'Nombre de bateaux détectés',
+                    label: 'Nombre de bateaux uniques',
                     data: counts,
                     backgroundColor: 'rgba(102, 126, 234, 0.7)',
                     borderColor: 'rgba(102, 126, 234, 1)',
@@ -282,7 +282,7 @@
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return `Nombre de bateaux: ${context.parsed.y}`;
+                                return `Nombre de bateaux uniques: ${context.parsed.y}`;
                             },
                             afterLabel: function(context) {
                                 const dataPoint = aggregatedData[context.dataIndex];
@@ -318,22 +318,44 @@
         
         data.forEach(detection => {
             let timestamp = null;
+            let mmsi = null;
             
+            // Extraire le timestamp et le MMSI
             // Format 1: timestamp Unix en millisecondes (champ 't')
             if (detection.t !== undefined) {
                 timestamp = new Date(detection.t);
+                // Extraire MMSI depuis data.MetaData
+                if (detection.data && detection.data.MetaData && detection.data.MetaData.MMSI) {
+                    mmsi = detection.data.MetaData.MMSI;
+                }
             }
             // Format 2: time_utc dans data.MetaData
             else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
                 timestamp = new Date(detection.data.MetaData.time_utc);
+                if (detection.data.MetaData.MMSI) {
+                    mmsi = detection.data.MetaData.MMSI;
+                }
             }
             // Format 3: timestamp standard
-            else if (detection.timestamp) timestamp = new Date(detection.timestamp);
-            else if (detection.time) timestamp = new Date(detection.time);
-            else if (detection.date) timestamp = new Date(detection.date);
-            else if (detection.detectionTime) timestamp = new Date(detection.detectionTime);
+            else if (detection.timestamp) {
+                timestamp = new Date(detection.timestamp);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.time) {
+                timestamp = new Date(detection.time);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.date) {
+                timestamp = new Date(detection.date);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.detectionTime) {
+                timestamp = new Date(detection.detectionTime);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
             
             if (!timestamp || isNaN(timestamp.getTime())) return;
+            if (!mmsi) return; // On ne compte que les détections avec MMSI
             
             let key = '';
             let formattedTime = '';
@@ -371,6 +393,7 @@
             if (!timeMap.has(key)) {
                 timeMap.set(key, {
                     key: key,
+                    mmsiSet: new Set(),
                     count: 0,
                     time: timestamp,
                     formattedTime: formattedTime,
@@ -379,7 +402,10 @@
             }
             
             const entry = timeMap.get(key);
-            entry.count++;
+            // Ajouter le MMSI au Set (automatiquement dédupliqué)
+            entry.mmsiSet.add(mmsi);
+            // Mettre à jour le count avec la taille du Set
+            entry.count = entry.mmsiSet.size;
         });
         
         const result = Array.from(timeMap.values());
