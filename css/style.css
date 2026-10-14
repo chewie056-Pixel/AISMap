@@ -635,8 +635,9 @@ button:hover {
 
 /* Analysis Modal */
 .analysis-modal {
-  max-width: 900px;
-  max-height: 90vh;
+  width: 80vw;
+  max-width: 1200px;
+  max-height: 85vh;
   overflow-y: auto;
 }
 
@@ -782,36 +783,53 @@ button:hover {
   border-color: #2E86DE;
 }
 
-/* Chart Container */
+/* Visualization Layout */
+.analysis-visual-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .analysis-tab-content .chart-container {
   background: white;
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  min-height: 300px;
+  flex: 1;
+  min-height: 400px;
 }
 
 .analysis-tab-content .chart-container canvas {
-  max-height: 400px;
+  width: 100% !important;
+  height: 400px !important;
 }
 
-/* Hover Info */
+/* Info Row - Horizontal layout */
+.analysis-info-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
 .analysis-hover-info {
   background: #e3f2fd;
   padding: 12px 16px;
   border-radius: 8px;
-  margin-bottom: 16px;
   border-left: 4px solid #2E86DE;
   font-size: 13px;
   color: #1c2733;
+  flex: 1;
+  min-width: 200px;
 }
 
-/* Stats */
+/* Stats - Horizontal layout */
 .analysis-stats {
   background: #f8f9fa;
   padding: 16px;
   border-radius: 8px;
+  flex: 1;
+  min-width: 300px;
 }
 
 .analysis-stats h3 {
@@ -822,7 +840,7 @@ button:hover {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
 }
 
@@ -831,6 +849,7 @@ button:hover {
   padding: 12px;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  text-align: center;
 }
 
 .stat-card .stat-label {
@@ -906,5 +925,13 @@ button:hover {
   
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .analysis-info-row {
+    flex-direction: column;
+  }
+  
+  .analysis-stats {
+    min-width: 100%;
   }
 }

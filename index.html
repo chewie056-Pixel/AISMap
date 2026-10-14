@@ -172,51 +172,55 @@
     </div>
 
     <div class="analysis-tab-content hidden" id="analysis-visual">
-      <div class="analysis-controls">
-        <div class="control-group">
-          <label for="analysis-aggregation">Agrégation par :</label>
-          <select id="analysis-aggregation">
-            <option value="hour">Heure</option>
-            <option value="minute">Minute</option>
-            <option value="day">Jour</option>
-          </select>
+      <div class="analysis-visual-layout">
+        <div class="analysis-controls">
+          <div class="control-group">
+            <label for="analysis-aggregation">Agrégation par :</label>
+            <select id="analysis-aggregation">
+              <option value="hour">Heure</option>
+              <option value="minute">Minute</option>
+              <option value="day">Jour</option>
+            </select>
+          </div>
+          <div class="control-group">
+            <label for="analysis-chartType">Type :</label>
+            <select id="analysis-chartType">
+              <option value="bar">Barres</option>
+              <option value="line">Ligne</option>
+            </select>
+          </div>
+          <button id="btn-analysis-update" class="btn-secondary">Mettre à jour</button>
         </div>
-        <div class="control-group">
-          <label for="analysis-chartType">Type :</label>
-          <select id="analysis-chartType">
-            <option value="bar">Barres</option>
-            <option value="line">Ligne</option>
-          </select>
+        
+        <div class="chart-container">
+          <canvas id="analysis-chart"></canvas>
         </div>
-        <button id="btn-analysis-update" class="btn-secondary">Mettre à jour</button>
-      </div>
-      
-      <div class="chart-container">
-        <canvas id="analysis-chart"></canvas>
-      </div>
-      
-      <div class="analysis-hover-info" id="analysis-hoverInfo">
-        Passez la souris sur le graphique pour voir les détails
-      </div>
-      
-      <div class="analysis-stats">
-        <h3>Résumé statistique</h3>
-        <div class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">Total bateaux uniques :</span>
-            <span class="stat-value" id="analysis-totalBoats">-</span>
+        
+        <div class="analysis-info-row">
+          <div class="analysis-hover-info" id="analysis-hoverInfo">
+            Passez la souris sur le graphique pour voir les détails
           </div>
-          <div class="stat-card">
-            <span class="stat-label">Pic maximum :</span>
-            <span class="stat-value" id="analysis-maxBoats">-</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Moyenne :</span>
-            <span class="stat-value" id="analysis-avgBoats">-</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Période :</span>
-            <span class="stat-value" id="analysis-periodCovered">-</span>
+          
+          <div class="analysis-stats">
+            <h3>Résumé statistique</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-label">Total bateaux uniques :</span>
+                <span class="stat-value" id="analysis-totalBoats">-</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Pic maximum :</span>
+                <span class="stat-value" id="analysis-maxBoats">-</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Moyenne :</span>
+                <span class="stat-value" id="analysis-avgBoats">-</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Période :</span>
+                <span class="stat-value" id="analysis-periodCovered">-</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
