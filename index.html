@@ -1,107 +1,142 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AISMap - Analyse des données AIS</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/luxon@3.0.1"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.2.0"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AIS Tracker</title>
+
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.css" />
+<link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>AISMap - Analyse des données AIS</h1>
-        </header>
-        
-        <div class="tabs-container">
-            <button class="tab-button active" data-tab="upload">Charger JSON</button>
-            <button class="tab-button" data-tab="visualization">Visualisation</button>
-        </div>
 
-        <div class="tab-content" id="upload">
-            <div class="upload-section">
-                <h2>Charger un fichier JSON</h2>
-                <p>Sélectionnez un fichier JSON contenant les données AIS (détections de bateaux avec timestamps).</p>
-                
-                <div class="file-upload">
-                    <input type="file" id="jsonFile" accept=".json" />
-                    <label for="jsonFile" class="upload-button">
-                        <span class="button-text">Choisir un fichier</span>
-                        <span class="file-name" id="fileName">Aucun fichier sélectionné</span>
-                    </label>
-                </div>
-                
-                <div class="file-info" id="fileInfo">
-                    <p>Fichier : <span id="loadedFileName">-</span></p>
-                    <p>Taille : <span id="fileSize">-</span></p>
-                    <p>Nombre de détections : <span id="detectionCount">-</span></p>
-                    <p>Période : <span id="timeRange">-</span></p>
-                </div>
-                
-                <button id="processBtn" class="process-button" disabled>Traiter les données</button>
-            </div>
-        </div>
+<div id="map"></div>
 
-        <div class="tab-content" id="visualization" style="display: none;">
-            <div class="visualization-section">
-                <h2>Visualisation des données</h2>
-                
-                <div class="chart-container">
-                    <canvas id="boatChart"></canvas>
-                </div>
-                
-                <div class="chart-controls">
-                    <div class="time-aggregation">
-                        <label for="timeAggregation">Agrégation par :</label>
-                        <select id="timeAggregation">
-                            <option value="hour">Heure</option>
-                            <option value="minute">Minute</option>
-                            <option value="day">Jour</option>
-                        </select>
-                    </div>
-                    
-                    <div class="chart-type">
-                        <label for="chartType">Type de graphique :</label>
-                        <select id="chartType">
-                            <option value="bar">Barres</option>
-                            <option value="line">Ligne</option>
-                        </select>
-                    </div>
-                    
-                    <button id="updateChartBtn" class="update-button">Mettre à jour</button>
-                </div>
-                
-                <div class="hover-info" id="hoverInfo">
-                    <p>Passez la souris sur le graphique pour voir les détails</p>
-                </div>
-                
-                <div class="stats-summary">
-                    <h3>Résumé statistique</h3>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <span class="stat-label">Total bateaux :</span>
-                            <span class="stat-value" id="totalBoats">-</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Pic maximum :</span>
-                            <span class="stat-value" id="maxBoats">-</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Moyenne/heure :</span>
-                            <span class="stat-value" id="avgBoats">-</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">Période couverte :</span>
-                            <span class="stat-value" id="periodCovered">-</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<div id="draw-zone-hint" class="hint-banner hidden">
+  Cliquez-glissez sur la carte pour dessiner la nouvelle zone · Échap pour annuler
+</div>
+
+<div id="replay-banner" class="replay-banner hidden">
+  ▶ Rejeu : <strong id="replay-banner-label"></strong>
+  · <span id="replay-banner-progress"></span>
+  · vitesse x<span id="replay-banner-speed"></span>
+  <button id="btn-replay-exit">Quitter le rejeu</button>
+</div>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="brand-dot"></span>
+    <h1>AIS Tracker <small>— suivi maritime en direct</small></h1>
+    <span id="recording-indicator" class="recording-indicator hidden" title="Un enregistrement est en cours sur le serveur">⏺ REC</span>
+  </div>
+
+  <div id="status" class="status status-disconnected">
+    <span class="status-led"></span>
+    <span id="status-text">Déconnecté</span>
+  </div>
+
+  <div id="conn-controls">
+    <div class="dropdown">
+      <button id="btn-map-menu" class="nav-link" title="Options d'affichage et zone de la carte">🗺️ Carte ▾</button>
+      <div id="map-menu" class="dropdown-panel hidden">
+        <label class="toggle-row-menu" title="Regrouper les navires proches en un seul indicateur numérique selon le zoom">
+          <input type="checkbox" id="aggregation-toggle" checked />
+          Agrégation des navires
+        </label>
+        <label class="toggle-row-menu" title="Afficher les stations AIS de base (Base Station Report) sur la carte">
+          <input type="checkbox" id="stations-toggle" />
+          📡 Stations de base
+        </label>
+        <label class="toggle-row-menu" title="Afficher les aides à la navigation (bouées, phares, balises AIS) sur la carte">
+          <input type="checkbox" id="aids-toggle" />
+          ⚓ Aides à la navigation
+        </label>
+
+        <div class="dropdown-divider"></div>
+
+        <button id="btn-recenter" class="dropdown-item">🔍 Recentrer sur la zone</button>
+        <button id="btn-draw-zone" class="dropdown-item">✏️ Dessiner une nouvelle zone</button>
+
+        <div class="dropdown-divider"></div>
+        <div class="dropdown-subheading">Zone (valeurs numériques)</div>
+        <div class="zone-grid">
+          <label>Nord <input type="number" id="zone-north" step="0.1"></label>
+          <label>Sud <input type="number" id="zone-south" step="0.1"></label>
+          <label>Ouest <input type="number" id="zone-west" step="0.1"></label>
+          <label>Est <input type="number" id="zone-east" step="0.1"></label>
         </div>
+        <button id="btn-zone-apply">Appliquer et reconnecter</button>
+      </div>
     </div>
 
-    <script src="script.js"></script>
+    <button id="btn-connect">Se connecter</button>
+    <button id="btn-disconnect" class="hidden">Se déconnecter</button>
+    <a id="btn-stations-link" class="nav-link" href="stations.html" title="Voir les stations AIS émettant dans la zone">📡 Stations</a>
+    <a id="btn-recording-link" class="nav-link" href="recording.html" title="Gérer l'enregistrement et le rejeu du flux AIS">⏺ Enregistrement</a>
+  </div>
+</header>
+
+<div id="login-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <button type="button" id="btn-login-modal-close" class="modal-close" title="Fermer" aria-label="Fermer">×</button>
+    <h2>Configuration du suivi AIS</h2>
+    <p>Entrez votre clé API AISStream.io et la zone géographique (boîte englobante) à surveiller.</p>
+    <label for="api-key-input">Clé API</label>
+    <input type="password" id="api-key-input" placeholder="Votre clé API AISStream.io" autocomplete="off" />
+    <label class="checkbox-row">
+      <input type="checkbox" id="remember-key" checked />
+      Mémoriser la clé sur cet appareil
+    </label>
+
+    <h3 class="modal-subheading">Zone géographique à surveiller</h3>
+    <div class="zone-grid">
+      <label>Nord <input type="number" id="setup-zone-north" step="0.1" placeholder="ex. 10" value="53.5"></label>
+      <label>Sud <input type="number" id="setup-zone-south" step="0.1" placeholder="ex. -10" value="48.3"></label>
+      <label>Ouest <input type="number" id="setup-zone-west" step="0.1" placeholder="ex. -20" value="-7"></label>
+      <label>Est <input type="number" id="setup-zone-east" step="0.1" placeholder="ex. 20" value="7"></label>
+    </div>
+    <button type="button" id="btn-setup-draw-zone" class="dropdown-item">✏️ Dessiner la zone sur la carte</button>
+
+    <div class="modal-actions">
+      <button id="btn-modal-connect">Se connecter</button>
+    </div>
+    <p class="hint">
+      Pas de clé ? Créez un compte gratuit sur
+      <a href="https://aisstream.io" target="_blank" rel="noopener">aisstream.io</a>.
+    </p>
+    <p id="login-error" class="login-error hidden"></p>
+  </div>
+</div>
+
+<div id="legend" class="panel">
+  <h3>Flotte visible</h3>
+  <div class="legend-total">
+    <span id="legend-total-count">0</span> navire(s) dans la vue
+  </div>
+  <ul id="legend-list"></ul>
+  <div class="legend-extra-counts">
+    <div>📡 <span id="legend-stations-count">0</span> station(s) visible(s)</div>
+    <div>⚓ <span id="legend-aids-count">0</span> aide(s) à la navigation visible(s)</div>
+  </div>
+  <div class="legend-footnote" id="legend-footnote">
+    Zoom ≥ <span id="legend-zoom-threshold"></span> : navires individuels · en-deçà : agrégats
+  </div>
+  <div class="legend-updated">Mis à jour : <span id="legend-updated-at">—</span></div>
+</div>
+
+<div id="safety-panel" class="panel hidden">
+  <h3>⚠ Messages de sécurité <span id="safety-count"></span></h3>
+  <ul id="safety-list"></ul>
+  <button id="btn-safety-clear">Effacer</button>
+</div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/leaflet.markercluster/leaflet.markercluster.js"></script>
+<script src="js/config.js"></script>
+<script src="js/shipTypes.js"></script>
+<script src="js/ws-utils.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

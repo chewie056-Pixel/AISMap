@@ -1,0 +1,5 @@
+# Serveur local : dépendances, configuration secrète (clé API) et enregistrements
+server/node_modules/
+server/config.json
+server/recordings/*
+!server/recordings/.gitkeep

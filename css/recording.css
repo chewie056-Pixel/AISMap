@@ -1,0 +1,92 @@
+#recording-no-config,
+#recording-section,
+#recordings-list-section,
+#replay-section {
+  position: static;
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+#recording-no-config p {
+  margin: 0 0 14px;
+  color: #445;
+  line-height: 1.5;
+}
+
+.format-choice {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.format-choice label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.recording-live-info {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.rec-dot {
+  color: #e74c3c;
+  animation: pulse 1.2s infinite;
+}
+
+.btn-stop {
+  background: #e74c3c;
+}
+.btn-stop:hover {
+  background: #c0392b;
+}
+
+#recordings-table td.actions-cell {
+  display: flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+#recordings-table button,
+#recordings-table a.table-action {
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.status-complete {
+  color: #27ae60;
+}
+.status-incomplete {
+  color: #e67e22;
+}
+
+.replay-current {
+  font-size: 14px;
+  margin-bottom: 14px;
+}
+
+.replay-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.replay-controls label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+#replay-speed-range {
+  width: 100%;
+}
+
+.replay-buttons {
+  display: flex;
+  gap: 8px;
+}
