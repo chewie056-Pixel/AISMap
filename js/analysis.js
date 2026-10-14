@@ -209,7 +209,7 @@
             document.querySelector('.analysis-tab-button[data-tab="analysis-visual"]').click();
             
             // Créer le graphique initial
-            createChart('10min', 'bar');
+            createChart('hour', 'bar');
             
         } catch (error) {
             alert(`Erreur: ${error.message}`);
