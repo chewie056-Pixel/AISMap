@@ -154,33 +154,54 @@
             
             detectionCount.textContent = analysisData.length;
             
-            // Extraire les timestamps
-            const timestamps = analysisData.map(d => {
-                // Format 1: timestamp Unix en millisecondes (champ 't')
+            // Extraire les timestamps et trouver le min
+            let minTime = null;
+            analysisData.forEach(d => {
+                let timestamp = null;
                 if (d.t !== undefined) {
-                    return new Date(d.t);
+                    timestamp = new Date(d.t);
                 }
-                // Format 2: time_utc dans data.MetaData
-                if (d.data && d.data.MetaData && d.data.MetaData.time_utc) {
-                    return new Date(d.data.MetaData.time_utc);
+                else if (d.data && d.data.MetaData && d.data.MetaData.time_utc) {
+                    timestamp = new Date(d.data.MetaData.time_utc);
                 }
-                // Format 3: timestamp standard
-                if (d.timestamp) return new Date(d.timestamp);
-                if (d.time) return new Date(d.time);
-                if (d.date) return new Date(d.date);
-                if (d.detectionTime) return new Date(d.detectionTime);
-                return null;
-            }).filter(Boolean);
+                else if (d.timestamp) timestamp = new Date(d.timestamp);
+                else if (d.time) timestamp = new Date(d.time);
+                else if (d.date) timestamp = new Date(d.date);
+                else if (d.detectionTime) timestamp = new Date(d.detectionTime);
+                
+                if (timestamp && !isNaN(timestamp.getTime())) {
+                    if (!minTime || timestamp.getTime() < minTime.getTime()) {
+                        minTime = timestamp;
+                    }
+                }
+            });
             
-            if (timestamps.length === 0) {
+            if (!minTime) {
                 throw new Error('Aucun timestamp valide trouvé dans les données');
             }
             
-            const minTime = new Date(Math.min(...timestamps.map(t => t.getTime())));
-            const maxTime = new Date(Math.max(...timestamps.map(t => t.getTime())));
-            
             // Stocker la date de début pour l'offset
             startTime = minTime;
+            
+            // Trouver maxTime pour la plage
+            let maxTime = minTime;
+            analysisData.forEach(d => {
+                let timestamp = null;
+                if (d.t !== undefined) {
+                    timestamp = new Date(d.t);
+                }
+                else if (d.data && d.data.MetaData && d.data.MetaData.time_utc) {
+                    timestamp = new Date(d.data.MetaData.time_utc);
+                }
+                else if (d.timestamp) timestamp = new Date(d.timestamp);
+                else if (d.time) timestamp = new Date(d.time);
+                else if (d.date) timestamp = new Date(d.date);
+                else if (d.detectionTime) timestamp = new Date(d.detectionTime);
+                
+                if (timestamp && !isNaN(timestamp.getTime()) && timestamp.getTime() > maxTime.getTime()) {
+                    maxTime = timestamp;
+                }
+            });
             
             timeRange.textContent = `${formatDate(minTime)} - ${formatDate(maxTime)}`;
             
@@ -188,7 +209,7 @@
             document.querySelector('.analysis-tab-button[data-tab="analysis-visual"]').click();
             
             // Créer le graphique initial
-            createChart('hour', 'bar');
+            createChart('10min', 'bar');
             
         } catch (error) {
             alert(`Erreur: ${error.message}`);
@@ -215,6 +236,19 @@
             hour: '2-digit',
             minute: '2-digit'
         });
+    }
+
+    // Formater l'offset de temps (secondes -> HH:MM:SS ou MM:SS)
+    function formatOffset(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        } else {
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
     }
 
     // Création du graphique
@@ -318,102 +352,40 @@
     }
 
     // Agrégation des données
-        function aggregateData(data, aggregation) {
+    function aggregateData(data, aggregation) {
         const timeMap = new Map();
         
         // Trouver le timestamp minimum pour calculer les offsets
-        let tempStartTime = null;
-        data.forEach(detection => {
-            let timestamp = null;
-            let mmsi = null;
-            
-            // Extraire le timestamp et le MMSI
-            if (detection.t !== undefined) {
-                timestamp = new Date(detection.t);
-                if (detection.data && detection.data.MetaData && detection.data.MetaData.MMSI) {
-                    mmsi = detection.data.MetaData.MMSI;
+        let referenceTime = startTime;
+        if (!referenceTime) {
+            let minTime = null;
+            data.forEach(detection => {
+                let timestamp = extractTimestamp(detection);
+                if (timestamp && !minTime) {
+                    minTime = timestamp;
+                } else if (timestamp && timestamp.getTime() < minTime.getTime()) {
+                    minTime = timestamp;
                 }
-            }
-            else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
-                timestamp = new Date(detection.data.MetaData.time_utc);
-                if (detection.data.MetaData.MMSI) {
-                    mmsi = detection.data.MetaData.MMSI;
-                }
-            }
-            else if (detection.timestamp) {
-                timestamp = new Date(detection.timestamp);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.time) {
-                timestamp = new Date(detection.time);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.date) {
-                timestamp = new Date(detection.date);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.detectionTime) {
-                timestamp = new Date(detection.detectionTime);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            
-            if (!timestamp || isNaN(timestamp.getTime())) return;
-            if (!mmsi) return;
-            
-            // Trouver la date de début si ce n'est pas encore fait
-            if (!tempStartTime || timestamp.getTime() < tempStartTime.getTime()) {
-                tempStartTime = new Date(timestamp.getTime());
-            }
-        });
+            });
+            referenceTime = minTime;
+        }
         
-        // Utiliser startTime global si disponible, sinon tempStartTime
-        const referenceTime = startTime || tempStartTime;
         if (!referenceTime) return [];
         
         data.forEach(detection => {
-            let timestamp = null;
-            let mmsi = null;
-            
-            // Extraire à nouveau (on pourrait optimiser mais c'est plus clair)
-            if (detection.t !== undefined) {
-                timestamp = new Date(detection.t);
-                if (detection.data && detection.data.MetaData && detection.data.MetaData.MMSI) {
-                    mmsi = detection.data.MetaData.MMSI;
-                }
-            }
-            else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
-                timestamp = new Date(detection.data.MetaData.time_utc);
-                if (detection.data.MetaData.MMSI) {
-                    mmsi = detection.data.MetaData.MMSI;
-                }
-            }
-            else if (detection.timestamp) {
-                timestamp = new Date(detection.timestamp);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.time) {
-                timestamp = new Date(detection.time);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.date) {
-                timestamp = new Date(detection.date);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.detectionTime) {
-                timestamp = new Date(detection.detectionTime);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
+            let timestamp = extractTimestamp(detection);
+            let mmsi = extractMMSI(detection);
             
             if (!timestamp || isNaN(timestamp.getTime())) return;
             if (!mmsi) return;
+            
+            const diffMs = timestamp.getTime() - referenceTime.getTime();
+            const diffMinutes = diffMs / (1000 * 60);
             
             let key = '';
             let formattedTime = '';
             let timeLabel = '';
             let offsetSeconds = 0;
-            
-            const diffMs = timestamp.getTime() - referenceTime.getTime();
-            const diffMinutes = diffMs / (1000 * 60);
             
             switch (aggregation) {
                 case '10min':
@@ -422,9 +394,7 @@
                     key = `bucket_${bucketIndex}`;
                     
                     // Temps du début du bucket
-                    const bucketStartMinutes = bucketIndex * 10;
-                    offsetSeconds = bucketStartMinutes * 60;
-                    
+                    offsetSeconds = bucketIndex * 10 * 60;
                     formattedTime = formatOffset(offsetSeconds);
                     timeLabel = formattedTime;
                     break;
@@ -441,13 +411,11 @@
                     break;
                     
                 default: // hour
-                    key = timestamp.toISOString().slice(0, 13);
-                    formattedTime = timestamp.toLocaleString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
+                    const bucketIndexHour = Math.floor(diffMinutes / 60);
+                    key = `hour_${bucketIndexHour}`;
+                    offsetSeconds = bucketIndexHour * 60 * 60;
+                    formattedTime = formatOffset(offsetSeconds);
                     timeLabel = formattedTime;
-                    offsetSeconds = diffMs / 1000;
             }
             
             if (!timeMap.has(key)) {
@@ -477,135 +445,29 @@
         
         return result;
     }
-            // Format 2: time_utc dans data.MetaData
-            else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
-                timestamp = new Date(detection.data.MetaData.time_utc);
-                if (detection.data.MetaData.MMSI) {
-                    mmsi = detection.data.MetaData.MMSI;
-                }
-            }
-            // Format 3: timestamp standard
-            else if (detection.timestamp) {
-                timestamp = new Date(detection.timestamp);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.time) {
-                timestamp = new Date(detection.time);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.date) {
-                timestamp = new Date(detection.date);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            else if (detection.detectionTime) {
-                timestamp = new Date(detection.detectionTime);
-                if (detection.MMSI) mmsi = detection.MMSI;
-            }
-            
-            if (!timestamp || isNaN(timestamp.getTime())) return;
-            if (!mmsi) return; // On ne compte que les détections avec MMSI
-            
-            let key = '';
-            let formattedTime = '';
-            let timeLabel = '';
-            
-            switch (aggregation) {
-                case '10min':
-                    // Agrégation par 10 minutes basée sur l'offset
-                    if (startTime) {
-                        const diffMs = timestamp.getTime() - startTime.getTime();
-                        const diffMinutes = Math.floor(diffMs / (1000 * 60));
-                        const bucketIndex = Math.floor(diffMinutes / 10);
-                        
-                        // Créer une clé de bucket unique
-                        key = `10min_${bucketIndex}`;
-                        
-                        // Calculer le temps de début du bucket
-                        const bucketStartMinutes = bucketIndex * 10;
-                        const bucketStartMs = bucketStartMinutes * 60 * 1000;
-                        const bucketStartDate = new Date(startTime.getTime() + bucketStartMs);
-                        
-                        formattedTime = bucketStartDate.toLocaleString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                        timeLabel = formattedTime;
-                    } else {
-                        // Fallback si startTime n'est pas défini
-                        const minutes = timestamp.getMinutes();
-                        const roundedMinutes = Math.floor(minutes / 10) * 10;
-                        const roundedDate = new Date(timestamp);
-                        roundedDate.setMinutes(roundedMinutes, 0, 0);
-                        
-                        key = roundedDate.toISOString().slice(0, 16);
-                        formattedTime = roundedDate.toLocaleString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit'
-                        });
-                        timeLabel = formattedTime;
-                    }
-                    break;
-                    
-                case 'day':
-                    key = timestamp.toISOString().slice(0, 10);
-                    formattedTime = timestamp.toLocaleString('fr-FR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                    });
-                    timeLabel = formattedTime;
-                    break;
-                    
-                default: // hour
-                    key = timestamp.toISOString().slice(0, 13);
-                    formattedTime = timestamp.toLocaleString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    timeLabel = formattedTime;
-            }
-            
-            if (!timeMap.has(key)) {
-                timeMap.set(key, {
-                    key: key,
-                    mmsiSet: new Set(),
-                    count: 0,
-                    time: timestamp,
-                    formattedTime: formattedTime,
-                    timeLabel: timeLabel,
-                    offsetSeconds: 0  // sera calculé plus tard
-                });
-            }
-            
-            const entry = timeMap.get(key);
-            // Ajouter le MMSI au Set (automatiquement dédupliqué)
-            entry.mmsiSet.add(mmsi);
-            // Mettre à jour le count avec la taille du Set
-            entry.count = entry.mmsiSet.size;
-        });
-        
-        const result = Array.from(timeMap.values());
-        result.sort((a, b) => a.time.getTime() - b.time.getTime());
-        
-        // Calculer l'offset pour chaque entrée
-        if (startTime) {
-            result.forEach(entry => {
-                // Pour 10min, utiliser le bucket index pour calculer l'offset
-                if (entry.key && entry.key.startsWith('10min_')) {
-                    const bucketIndex = parseInt(entry.key.replace('10min_', ''));
-                    const bucketStartMinutes = bucketIndex * 10;
-                    const totalSeconds = bucketStartMinutes * 60;
-                    entry.offsetSeconds = totalSeconds;
-                    entry.offsetLabel = formatOffset(totalSeconds);
-                } else {
-                    const diffMs = entry.time.getTime() - startTime.getTime();
-                    entry.offsetSeconds = diffMs / 1000;
-                    entry.offsetLabel = formatOffset(entry.offsetSeconds);
-                }
-            });
+
+    // Extraire le timestamp d'une détection
+    function extractTimestamp(detection) {
+        if (detection.t !== undefined) {
+            return new Date(detection.t);
         }
-        
-        return result;
+        if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
+            return new Date(detection.data.MetaData.time_utc);
+        }
+        if (detection.timestamp) return new Date(detection.timestamp);
+        if (detection.time) return new Date(detection.time);
+        if (detection.date) return new Date(detection.date);
+        if (detection.detectionTime) return new Date(detection.detectionTime);
+        return null;
+    }
+
+    // Extraire le MMSI d'une détection
+    function extractMMSI(detection) {
+        if (detection.data && detection.data.MetaData && detection.data.MetaData.MMSI) {
+            return detection.data.MetaData.MMSI;
+        }
+        if (detection.MMSI) return detection.MMSI;
+        return null;
     }
 
     // Mise à jour des statistiques
@@ -630,7 +492,7 @@
 
     // Affichage des informations détaillées
     function showDetailedInfo(dataPoint) {
-        hoverInfo.textContent = `Période : ${dataPoint.formattedTime} | Nombre de bateaux : ${dataPoint.count}`;
+        hoverInfo.textContent = `Période : ${dataPoint.formattedTime} | Bateaux : ${dataPoint.count}`;
     }
 
     // Initialisation des contrôles du graphique
@@ -646,19 +508,6 @@
         updateBtn.addEventListener('click', () => {
             createChart(aggregationSelect.value, chartTypeSelect.value);
         });
-    }
-
-    // Formater l'offset de temps (secondes -> HH:MM:SS ou MM:SS)
-    function formatOffset(seconds) {
-        const hours = Math.floor(seconds / 3600);
-        const minutes = Math.floor((seconds % 3600) / 60);
-        const secs = Math.floor(seconds % 60);
-        
-        if (hours > 0) {
-            return `${hours}h ${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        } else {
-            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        }
     }
 
     // Initialisation au chargement de la page
