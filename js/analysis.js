@@ -273,7 +273,8 @@
                     x: {
                         title: {
                             display: true,
-                            text: 'Temps écoulé (depuis le début)'
+                            text: aggregation === 'hour' ? 'Temps écoulé (heures)' : 
+                                 aggregation === '10min' ? 'Temps écoulé (10 min)' : 'Temps écoulé (jours)'
                         },
                         ticks: {
                             maxRotation: 45,
@@ -368,18 +369,39 @@
             
             switch (aggregation) {
                 case '10min':
-                    // Arrondir à 10 minutes
-                    const minutes = timestamp.getMinutes();
-                    const roundedMinutes = Math.floor(minutes / 10) * 10;
-                    const roundedDate = new Date(timestamp);
-                    roundedDate.setMinutes(roundedMinutes, 0, 0);
-                    
-                    key = roundedDate.toISOString().slice(0, 16);
-                    formattedTime = roundedDate.toLocaleString('fr-FR', {
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
-                    timeLabel = formattedTime;
+                    // Agrégation par 10 minutes basée sur l'offset
+                    if (startTime) {
+                        const diffMs = timestamp.getTime() - startTime.getTime();
+                        const diffMinutes = Math.floor(diffMs / (1000 * 60));
+                        const bucketIndex = Math.floor(diffMinutes / 10);
+                        
+                        // Créer une clé de bucket unique
+                        key = `10min_${bucketIndex}`;
+                        
+                        // Calculer le temps de début du bucket
+                        const bucketStartMinutes = bucketIndex * 10;
+                        const bucketStartMs = bucketStartMinutes * 60 * 1000;
+                        const bucketStartDate = new Date(startTime.getTime() + bucketStartMs);
+                        
+                        formattedTime = bucketStartDate.toLocaleString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        timeLabel = formattedTime;
+                    } else {
+                        // Fallback si startTime n'est pas défini
+                        const minutes = timestamp.getMinutes();
+                        const roundedMinutes = Math.floor(minutes / 10) * 10;
+                        const roundedDate = new Date(timestamp);
+                        roundedDate.setMinutes(roundedMinutes, 0, 0);
+                        
+                        key = roundedDate.toISOString().slice(0, 16);
+                        formattedTime = roundedDate.toLocaleString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                        timeLabel = formattedTime;
+                    }
                     break;
                     
                 case 'day':
@@ -423,13 +445,21 @@
         const result = Array.from(timeMap.values());
         result.sort((a, b) => a.time.getTime() - b.time.getTime());
         
-        // Calculer l'offset en secondes par rapport au début
+        // Calculer l'offset pour chaque entrée
         if (startTime) {
             result.forEach(entry => {
-                const diffMs = entry.time.getTime() - startTime.getTime();
-                entry.offsetSeconds = diffMs / 1000;
-                // Formater l'offset comme HH:MM:SS ou MM:SS selon la durée
-                entry.offsetLabel = formatOffset(entry.offsetSeconds);
+                // Pour 10min, utiliser le bucket index pour calculer l'offset
+                if (entry.key && entry.key.startsWith('10min_')) {
+                    const bucketIndex = parseInt(entry.key.replace('10min_', ''));
+                    const bucketStartMinutes = bucketIndex * 10;
+                    const totalSeconds = bucketStartMinutes * 60;
+                    entry.offsetSeconds = totalSeconds;
+                    entry.offsetLabel = formatOffset(totalSeconds);
+                } else {
+                    const diffMs = entry.time.getTime() - startTime.getTime();
+                    entry.offsetSeconds = diffMs / 1000;
+                    entry.offsetLabel = formatOffset(entry.offsetSeconds);
+                }
             });
         }
         
