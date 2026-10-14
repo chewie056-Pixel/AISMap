@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "stop": "pkill -f "node.*server.js" || killall -9 node"
+    "stop": "pkill -f node || killall -9 node"
   },
   "dependencies": {
     "ws": "^8.18.0"

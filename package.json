@@ -1,0 +1,12 @@
+{
+  "name": "ais-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIS Tracker - Application complète avec serveur et interface web",
+  "scripts": {
+    "start": "cd server && npm start",
+    "stop": "cd server && npm stop",
+    "server:start": "cd server && npm start",
+    "server:stop": "cd server && npm stop"
+  }
+}
