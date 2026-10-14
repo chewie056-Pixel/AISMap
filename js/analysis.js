@@ -9,6 +9,7 @@
     let analysisChart = null;
     let currentAggregation = 'hour';
     let currentChartType = 'bar';
+    let startTime = null;  // Date de début pour calculer l'offset
 
     // Éléments DOM
     const modal = document.getElementById('analysis-modal');
@@ -178,6 +179,9 @@
             const minTime = new Date(Math.min(...timestamps.map(t => t.getTime())));
             const maxTime = new Date(Math.max(...timestamps.map(t => t.getTime())));
             
+            // Stocker la date de début pour l'offset
+            startTime = minTime;
+            
             timeRange.textContent = `${formatDate(minTime)} - ${formatDate(maxTime)}`;
             
             // Passer à l'onglet de visualisation
@@ -225,7 +229,7 @@
         
         const aggregatedData = aggregateData(analysisData, aggregation);
         
-        const labels = aggregatedData.map(item => item.timeLabel);
+        const labels = aggregatedData.map(item => item.offsetLabel || item.timeLabel);
         const counts = aggregatedData.map(item => item.count);
         
         updateStats(aggregatedData);
@@ -269,8 +273,7 @@
                     x: {
                         title: {
                             display: true,
-                            text: aggregation === 'hour' ? 'Heure' : 
-                                 aggregation === 'minute' ? 'Minute' : 'Jour'
+                            text: 'Temps écoulé (depuis le début)'
                         },
                         ticks: {
                             maxRotation: 45,
@@ -282,12 +285,14 @@
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return `Nombre de bateaux uniques: ${context.parsed.y}`;
+                                return `Bateaux uniques: ${context.parsed.y}`;
                             },
                             afterLabel: function(context) {
                                 const dataPoint = aggregatedData[context.dataIndex];
-                                if (dataPoint && dataPoint.formattedTime) {
-                                    return `Heure: ${dataPoint.formattedTime}`;
+                                if (dataPoint) {
+                                    const realTime = dataPoint.formattedTime ? `Heure: ${dataPoint.formattedTime}` : '';
+                                    const offsetTime = dataPoint.offsetLabel ? `Offset: ${dataPoint.offsetLabel}` : '';
+                                    return [realTime, offsetTime].filter(Boolean).join(' | ');
                                 }
                                 return null;
                             }
@@ -397,7 +402,8 @@
                     count: 0,
                     time: timestamp,
                     formattedTime: formattedTime,
-                    timeLabel: timeLabel
+                    timeLabel: timeLabel,
+                    offsetSeconds: 0  // sera calculé plus tard
                 });
             }
             
@@ -410,6 +416,16 @@
         
         const result = Array.from(timeMap.values());
         result.sort((a, b) => a.time.getTime() - b.time.getTime());
+        
+        // Calculer l'offset en secondes par rapport au début
+        if (startTime) {
+            result.forEach(entry => {
+                const diffMs = entry.time.getTime() - startTime.getTime();
+                entry.offsetSeconds = diffMs / 1000;
+                // Formater l'offset comme HH:MM:SS ou MM:SS selon la durée
+                entry.offsetLabel = formatOffset(entry.offsetSeconds);
+            });
+        }
         
         return result;
     }
@@ -452,6 +468,19 @@
         updateBtn.addEventListener('click', () => {
             createChart(aggregationSelect.value, chartTypeSelect.value);
         });
+    }
+
+    // Formater l'offset de temps (secondes -> HH:MM:SS ou MM:SS)
+    function formatOffset(seconds) {
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        
+        if (hours > 0) {
+            return `${hours}h ${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        } else {
+            return `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
     }
 
     // Initialisation au chargement de la page
