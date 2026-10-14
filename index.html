@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.css" />
 <link rel="stylesheet" href="vendor/leaflet.markercluster/MarkerCluster.Default.css" />
 <link rel="stylesheet" href="css/style.css" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -75,6 +76,7 @@
     <button id="btn-disconnect" class="hidden">Se déconnecter</button>
     <a id="btn-stations-link" class="nav-link" href="stations.html" title="Voir les stations AIS émettant dans la zone">📡 Stations</a>
     <a id="btn-recording-link" class="nav-link" href="recording.html" title="Gérer l'enregistrement et le rejeu du flux AIS">⏺ Enregistrement</a>
+    <button id="btn-analysis" class="nav-link" title="Analyser les données JSON enregistrées">📊 Analyse</button>
   </div>
 </header>
 
@@ -138,5 +140,89 @@
 <script src="js/shipTypes.js"></script>
 <script src="js/ws-utils.js"></script>
 <script src="js/app.js"></script>
+<div id="analysis-modal" class="modal-overlay hidden">
+  <div class="modal analysis-modal">
+    <button type="button" id="btn-analysis-modal-close" class="modal-close" title="Fermer" aria-label="Fermer">×</button>
+    <h2>Analyse des données AIS</h2>
+    
+    <div class="analysis-tabs">
+      <button class="analysis-tab-button active" data-tab="analysis-upload">Charger JSON</button>
+      <button class="analysis-tab-button" data-tab="analysis-visual">Visualisation</button>
+    </div>
+
+    <div class="analysis-tab-content" id="analysis-upload">
+      <p>Sélectionnez un fichier JSON contenant les données AIS enregistrées.</p>
+      
+      <div class="file-upload">
+        <input type="file" id="analysis-jsonFile" accept=".json" />
+        <label for="analysis-jsonFile" class="upload-button">
+          <span class="button-text">Choisir un fichier</span>
+          <span class="file-name" id="analysis-fileName">Aucun fichier sélectionné</span>
+        </label>
+      </div>
+      
+      <div class="file-info" id="analysis-fileInfo">
+        <p>Fichier : <span id="analysis-loadedFileName">-</span></p>
+        <p>Taille : <span id="analysis-fileSize">-</span></p>
+        <p>Détections : <span id="analysis-detectionCount">-</span></p>
+        <p>Période : <span id="analysis-timeRange">-</span></p>
+      </div>
+      
+      <button id="btn-analysis-process" class="btn-primary" disabled>Traiter les données</button>
+    </div>
+
+    <div class="analysis-tab-content hidden" id="analysis-visual">
+      <div class="analysis-controls">
+        <div class="control-group">
+          <label for="analysis-aggregation">Agrégation par :</label>
+          <select id="analysis-aggregation">
+            <option value="hour">Heure</option>
+            <option value="minute">Minute</option>
+            <option value="day">Jour</option>
+          </select>
+        </div>
+        <div class="control-group">
+          <label for="analysis-chartType">Type :</label>
+          <select id="analysis-chartType">
+            <option value="bar">Barres</option>
+            <option value="line">Ligne</option>
+          </select>
+        </div>
+        <button id="btn-analysis-update" class="btn-secondary">Mettre à jour</button>
+      </div>
+      
+      <div class="chart-container">
+        <canvas id="analysis-chart"></canvas>
+      </div>
+      
+      <div class="analysis-hover-info" id="analysis-hoverInfo">
+        Passez la souris sur le graphique pour voir les détails
+      </div>
+      
+      <div class="analysis-stats">
+        <h3>Résumé statistique</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Total bateaux :</span>
+            <span class="stat-value" id="analysis-totalBoats">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Pic maximum :</span>
+            <span class="stat-value" id="analysis-maxBoats">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Moyenne :</span>
+            <span class="stat-value" id="analysis-avgBoats">-</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Période :</span>
+            <span class="stat-value" id="analysis-periodCovered">-</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="js/analysis.js"></script>
 </body>
 </html>
