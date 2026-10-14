@@ -273,8 +273,7 @@
                     x: {
                         title: {
                             display: true,
-                            text: aggregation === 'hour' ? 'Temps écoulé (heures)' : 
-                                 aggregation === '10min' ? 'Temps écoulé (10 min)' : 'Temps écoulé (jours)'
+                            text: 'Temps écoulé'
                         },
                         ticks: {
                             maxRotation: 45,
@@ -319,22 +318,165 @@
     }
 
     // Agrégation des données
-    function aggregateData(data, aggregation) {
+        function aggregateData(data, aggregation) {
         const timeMap = new Map();
         
+        // Trouver le timestamp minimum pour calculer les offsets
+        let tempStartTime = null;
         data.forEach(detection => {
             let timestamp = null;
             let mmsi = null;
             
             // Extraire le timestamp et le MMSI
-            // Format 1: timestamp Unix en millisecondes (champ 't')
             if (detection.t !== undefined) {
                 timestamp = new Date(detection.t);
-                // Extraire MMSI depuis data.MetaData
                 if (detection.data && detection.data.MetaData && detection.data.MetaData.MMSI) {
                     mmsi = detection.data.MetaData.MMSI;
                 }
             }
+            else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
+                timestamp = new Date(detection.data.MetaData.time_utc);
+                if (detection.data.MetaData.MMSI) {
+                    mmsi = detection.data.MetaData.MMSI;
+                }
+            }
+            else if (detection.timestamp) {
+                timestamp = new Date(detection.timestamp);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.time) {
+                timestamp = new Date(detection.time);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.date) {
+                timestamp = new Date(detection.date);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.detectionTime) {
+                timestamp = new Date(detection.detectionTime);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            
+            if (!timestamp || isNaN(timestamp.getTime())) return;
+            if (!mmsi) return;
+            
+            // Trouver la date de début si ce n'est pas encore fait
+            if (!tempStartTime || timestamp.getTime() < tempStartTime.getTime()) {
+                tempStartTime = new Date(timestamp.getTime());
+            }
+        });
+        
+        // Utiliser startTime global si disponible, sinon tempStartTime
+        const referenceTime = startTime || tempStartTime;
+        if (!referenceTime) return [];
+        
+        data.forEach(detection => {
+            let timestamp = null;
+            let mmsi = null;
+            
+            // Extraire à nouveau (on pourrait optimiser mais c'est plus clair)
+            if (detection.t !== undefined) {
+                timestamp = new Date(detection.t);
+                if (detection.data && detection.data.MetaData && detection.data.MetaData.MMSI) {
+                    mmsi = detection.data.MetaData.MMSI;
+                }
+            }
+            else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
+                timestamp = new Date(detection.data.MetaData.time_utc);
+                if (detection.data.MetaData.MMSI) {
+                    mmsi = detection.data.MetaData.MMSI;
+                }
+            }
+            else if (detection.timestamp) {
+                timestamp = new Date(detection.timestamp);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.time) {
+                timestamp = new Date(detection.time);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.date) {
+                timestamp = new Date(detection.date);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            else if (detection.detectionTime) {
+                timestamp = new Date(detection.detectionTime);
+                if (detection.MMSI) mmsi = detection.MMSI;
+            }
+            
+            if (!timestamp || isNaN(timestamp.getTime())) return;
+            if (!mmsi) return;
+            
+            let key = '';
+            let formattedTime = '';
+            let timeLabel = '';
+            let offsetSeconds = 0;
+            
+            const diffMs = timestamp.getTime() - referenceTime.getTime();
+            const diffMinutes = diffMs / (1000 * 60);
+            
+            switch (aggregation) {
+                case '10min':
+                    // Agrégation par buckets de 10 minutes depuis le début
+                    const bucketIndex = Math.floor(diffMinutes / 10);
+                    key = `bucket_${bucketIndex}`;
+                    
+                    // Temps du début du bucket
+                    const bucketStartMinutes = bucketIndex * 10;
+                    offsetSeconds = bucketStartMinutes * 60;
+                    
+                    formattedTime = formatOffset(offsetSeconds);
+                    timeLabel = formattedTime;
+                    break;
+                    
+                case 'day':
+                    key = timestamp.toISOString().slice(0, 10);
+                    formattedTime = timestamp.toLocaleString('fr-FR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    });
+                    timeLabel = formattedTime;
+                    offsetSeconds = diffMs / 1000;
+                    break;
+                    
+                default: // hour
+                    key = timestamp.toISOString().slice(0, 13);
+                    formattedTime = timestamp.toLocaleString('fr-FR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                    timeLabel = formattedTime;
+                    offsetSeconds = diffMs / 1000;
+            }
+            
+            if (!timeMap.has(key)) {
+                timeMap.set(key, {
+                    key: key,
+                    mmsiSet: new Set(),
+                    count: 0,
+                    time: timestamp,
+                    formattedTime: formattedTime,
+                    timeLabel: timeLabel,
+                    offsetSeconds: offsetSeconds
+                });
+            }
+            
+            const entry = timeMap.get(key);
+            entry.mmsiSet.add(mmsi);
+            entry.count = entry.mmsiSet.size;
+        });
+        
+        const result = Array.from(timeMap.values());
+        result.sort((a, b) => a.offsetSeconds - b.offsetSeconds);
+        
+        // Ajouter l'offsetLabel pour l'affichage
+        result.forEach(entry => {
+            entry.offsetLabel = formatOffset(entry.offsetSeconds);
+        });
+        
+        return result;
+    }
             // Format 2: time_utc dans data.MetaData
             else if (detection.data && detection.data.MetaData && detection.data.MetaData.time_utc) {
                 timestamp = new Date(detection.data.MetaData.time_utc);
