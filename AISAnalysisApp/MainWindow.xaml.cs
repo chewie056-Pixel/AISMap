@@ -14,10 +14,16 @@ namespace AISAnalysisApp
     {
         private List<AISDataAnalyzer.AISDetection> _detections;
         private AnalysisResult _currentResult;
+        private readonly OxyPlot.Wpf.PlotView _plotView;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            // PlotView créé par code pour éviter le chargement ReflectionOnly
+            // des assemblages OxyPlot par le compilateur XAML (markup compiler)
+            _plotView = new OxyPlot.Wpf.PlotView();
+            chartHost.Child = _plotView;
         }
 
         private void LoadJson_Click(object sender, RoutedEventArgs e)
@@ -136,7 +142,7 @@ namespace AISAnalysisApp
         {
             if (_currentResult == null || _currentResult.DataPoints.Count == 0)
             {
-                chart.Model = null;
+                _plotView.Model = null;
                 return;
             }
 
@@ -208,7 +214,7 @@ namespace AISAnalysisApp
             plotModel.Axes.Add(categoryAxis);
             plotModel.Axes.Add(valueAxis);
 
-            chart.Model = plotModel;
+            _plotView.Model = plotModel;
         }
     }
 }
