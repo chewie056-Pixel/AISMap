@@ -196,8 +196,7 @@ namespace AISAnalysisApp
                     MarkerType = MarkerType.Circle,
                     MarkerSize = 4,
                     MarkerFill = OxyColors.SteelBlue,
-                    MarkerStroke = OxyColors.White,
-                    InterpolationAlgorithm = InterpolationAlgorithms.UniformCatmullRom
+                    MarkerStroke = OxyColors.White
                 };
 
                 for (int i = 0; i < _currentResult.DataPoints.Count; i++)

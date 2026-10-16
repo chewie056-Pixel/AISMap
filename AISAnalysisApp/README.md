@@ -1,12 +1,12 @@
 # AISAnalysisApp
 
-Application WPF (.NET 8) d'analyse de fichiers JSON de détections AIS, avec graphique **OxyPlot**.
+Application WPF (.NET Framework 4.8) d'analyse de fichiers JSON de détections AIS, avec graphique **OxyPlot 2014.1.546**.
 
 ## Structure
 
 ```
 AISAnalysisApp/
-├── AISAnalysisApp.csproj   # Projet (package OxyPlot.Wpf)
+├── AISAnalysisApp.csproj   # Projet .NET Framework 4.8 (packages.config)
 ├── App.xaml / App.xaml.cs
 ├── MainWindow.xaml         # Interface (PlotView OxyPlot)
 ├── MainWindow.xaml.cs      # Code-behind (création du PlotModel)
@@ -16,13 +16,11 @@ AISAnalysisApp/
 
 ## Compilation
 
-```bash
-dotnet build
-```
+Ouvrir `AISAnalysisApp.csproj` dans Visual Studio, restaurer les packages NuGet (OxyPlot 2014.1.546 + Newtonsoft.Json), puis Build.
 
 ## Utilisation
 
-1. Lancer l'application (`dotnet run`)
+1. Lancer l'application (F5 dans Visual Studio)
 2. **Charger JSON** : sélectionner un fichier de détections AIS
 3. **Analyser** : génère le graphique et les statistiques
 4. Choisir l'agrégation (heure / 30 min / 10 min / 2 min) et le type (barres / ligne), puis **Mettre à jour**
@@ -50,5 +48,7 @@ Champs alternatifs acceptés : `timestamp`, `time`, `date`, `detectionTime`, et 
 ## Export PNG
 
 ```csharp
-PngExporter.Export(chart.Model, "analyse.png", 1200, 600);
+var pngExporter = new OxyPlot.WindowsForms.PngExporter { Width = 1200, Height = 600 };
+// En 2014.1.546, l'export PNG se fait via :
+// OxyPlot.Wpf.PngExporter.Export(chart.Model, "analyse.png", 1200, 600);
 ```

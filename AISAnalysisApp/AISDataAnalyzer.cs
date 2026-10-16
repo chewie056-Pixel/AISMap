@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.Json;
+using Newtonsoft.Json.Linq;
 
 namespace AISAnalysisApp
 {
@@ -34,15 +34,14 @@ namespace AISAnalysisApp
 
         public static List<AISDetection> ParseAISFile(string filePath)
         {
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            using var doc = JsonDocument.Parse(File.ReadAllText(filePath));
+            var root = JToken.Parse(File.ReadAllText(filePath));
 
-            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+            if (!(root is JArray))
                 throw new InvalidDataException("Le fichier JSON doit contenir un tableau de d\u00e9tections");
 
             var detections = new List<AISDetection>();
 
-            foreach (var element in doc.RootElement.EnumerateArray())
+            foreach (var element in (JArray)root)
             {
                 var timestamp = ExtractTimestamp(element);
                 var mmsi = ExtractMMSI(element);
@@ -63,78 +62,80 @@ namespace AISAnalysisApp
             return detections;
         }
 
-        private static DateTime? ExtractTimestamp(JsonElement element)
+        private static DateTime? ExtractTimestamp(JToken element)
         {
             // Format principal : { "t": ... }
-            if (element.TryGetProperty("t", out var t))
+            var t = element["t"];
+            if (t != null)
             {
-                if (TryParseDate(t, out var date)) return date;
+                var date = TryParseDate(t);
+                if (date.HasValue) return date;
             }
 
             // Format AISMap : { "data": { "MetaData": { "time_utc": ... } } }
-            if (element.TryGetProperty("data", out var data) &&
-                data.ValueKind == JsonValueKind.Object &&
-                data.TryGetProperty("MetaData", out var meta) &&
-                meta.ValueKind == JsonValueKind.Object &&
-                meta.TryGetProperty("time_utc", out var timeUtc) &&
-                TryParseDate(timeUtc, out var metaDate))
+            var timeUtc = element.SelectToken("data.MetaData.time_utc");
+            if (timeUtc != null)
             {
-                return metaDate;
+                var date = TryParseDate(timeUtc);
+                if (date.HasValue) return date;
             }
 
             // Formats alternatifs
             string[] altKeys = { "timestamp", "time", "date", "detectionTime" };
             foreach (var key in altKeys)
             {
-                if (element.TryGetProperty(key, out var prop) && TryParseDate(prop, out var d))
-                    return d;
+                var prop = element[key];
+                if (prop != null)
+                {
+                    var date = TryParseDate(prop);
+                    if (date.HasValue) return date;
+                }
             }
 
             return null;
         }
 
-        private static string ExtractMMSI(JsonElement element)
+        private static string ExtractMMSI(JToken element)
         {
-            if (element.TryGetProperty("data", out var data) &&
-                data.ValueKind == JsonValueKind.Object &&
-                data.TryGetProperty("MetaData", out var meta) &&
-                meta.ValueKind == JsonValueKind.Object &&
-                meta.TryGetProperty("MMSI", out var mmsiProp))
-            {
-                return mmsiProp.ValueKind == JsonValueKind.Number
-                    ? mmsiProp.GetRawText()
-                    : mmsiProp.GetString();
-            }
+            var mmsi = element.SelectToken("data.MetaData.MMSI");
+            if (mmsi == null)
+                mmsi = element["MMSI"];
 
-            if (element.TryGetProperty("MMSI", out var direct))
-            {
-                return direct.ValueKind == JsonValueKind.Number
-                    ? direct.GetRawText()
-                    : direct.GetString();
-            }
+            if (mmsi == null)
+                return null;
 
-            return null;
+            return mmsi.Type == JTokenType.Integer
+                ? mmsi.Value<long>().ToString()
+                : mmsi.ToString();
         }
 
-        private static bool TryParseDate(JsonElement element, out DateTime date)
+        private static DateTime? TryParseDate(JToken token)
         {
-            date = default;
             try
             {
-                string raw = element.ValueKind == JsonValueKind.Number
-                    ? DateTimeOffset.FromUnixTimeMilliseconds(element.GetInt64()).DateTime.ToString("o")
-                    : element.GetString();
+                if (token.Type == JTokenType.Integer)
+                {
+                    // Timestamp Unix (secondes ou millisecondes)
+                    var value = token.Value<long>();
+                    var epoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+                    return value > 100000000000
+                        ? epoch.AddMilliseconds(value)
+                        : epoch.AddSeconds(value);
+                }
 
-                if (string.IsNullOrEmpty(raw)) return false;
+                var raw = token.ToString();
+                if (string.IsNullOrEmpty(raw))
+                    return null;
 
-                if (DateTime.TryParse(raw, null, System.Globalization.DateTimeStyles.RoundtripKind, out date))
-                    return true;
+                DateTime date;
+                if (DateTime.TryParse(raw, out date))
+                    return date;
 
-                return DateTime.TryParse(raw, out date);
+                return null;
             }
             catch
             {
-                return false;
+                return null;
             }
         }
 
@@ -192,8 +193,8 @@ namespace AISAnalysisApp
             var secs = (int)(seconds % 60);
 
             return hours > 0
-                ? $"{hours}h {minutes:D2}:{secs:D2}"
-                : $"{minutes:D2}:{secs:D2}";
+                ? string.Format("{0}h {1:D2}:{2:D2}", hours, minutes, secs)
+                : string.Format("{0:D2}:{1:D2}", minutes, secs);
         }
     }
 }
